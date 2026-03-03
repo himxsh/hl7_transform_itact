@@ -1,0 +1,531 @@
+{
+  "version": "2.8",
+  "children": [
+    {
+      "type": "frame",
+      "id": "bi8Au",
+      "x": 0,
+      "y": 0,
+      "name": "Frame",
+      "clip": true,
+      "width": 600,
+      "height": 980,
+      "fill": "#0A0A0A",
+      "layout": "vertical",
+      "padding": 40,
+      "children": [
+        {
+          "type": "text",
+          "id": "MZunX",
+          "name": "title",
+          "fill": "#FAFAFA",
+          "content": "How It Works",
+          "fontFamily": "JetBrains Mono",
+          "fontSize": 28,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "pTGm1",
+          "name": "sub",
+          "fill": "#6B7280",
+          "content": "From raw hospital data to secure HL7 messages",
+          "fontFamily": "IBM Plex Mono",
+          "fontSize": 13,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "zMyyN",
+          "name": "gap0",
+          "width": "fill_container",
+          "height": 28
+        },
+        {
+          "type": "frame",
+          "id": "YvWLc",
+          "name": "b1",
+          "width": "fill_container",
+          "fill": "#091510",
+          "layout": "vertical",
+          "gap": 6,
+          "padding": [
+            16,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "1iqt3",
+              "name": "b1t",
+              "fill": "#10B981",
+              "content": "Hospital Data (MIMIC-IV)",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "Fs6vI",
+              "name": "b1d",
+              "fill": "#6B7280",
+              "content": "Raw patient records — lab results, demographics",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "HiRPG",
+              "name": "b1tag",
+              "fill": "#10B981",
+              "content": "[ our addition ]",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 10,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "bVNO9",
+          "name": "ar1",
+          "width": "fill_container",
+          "height": 36,
+          "padding": [
+            0,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "H7o3T",
+              "name": "ar1t",
+              "fill": "#4B5563",
+              "content": "↓  Clean & merge into 50 patient records",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "numZy",
+          "name": "b2",
+          "width": "fill_container",
+          "fill": "#050E14",
+          "layout": "vertical",
+          "gap": 6,
+          "padding": [
+            16,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "h6apS",
+              "name": "b2t",
+              "fill": "#06B6D4",
+              "content": "Build HL7 Message",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "f7CkM",
+              "name": "b2d",
+              "fill": "#6B7280",
+              "content": "Turn patient data into the standard hospital file format",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "Kpg45",
+              "name": "b2tag",
+              "fill": "#06B6D4",
+              "content": "[ original hl7_transform library — unchanged ]",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 10,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "rXd8o",
+          "name": "ar2",
+          "width": "fill_container",
+          "height": 36,
+          "padding": [
+            0,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "cMFhT",
+              "name": "ar2t",
+              "fill": "#10B981",
+              "content": "↓  Before writing any patient name or address…",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Rh8yh",
+          "name": "b3",
+          "width": "fill_container",
+          "fill": "#091510",
+          "layout": "vertical",
+          "gap": 6,
+          "padding": [
+            16,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "bzOGf",
+              "name": "b3t",
+              "fill": "#10B981",
+              "content": "Hide Patient Identity",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "KsDsq",
+              "name": "b3d",
+              "fill": "#6B7280",
+              "content": "Replace real names & addresses with realistic fake ones.\nScrub any ID numbers hidden in clinical notes.",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "I6kKO",
+              "name": "b3tag",
+              "fill": "#10B981",
+              "content": "[ our addition — DPDP Act 2023 compliance ]",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 10,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "KcFgQ",
+          "name": "ar3",
+          "width": "fill_container",
+          "height": 36,
+          "padding": [
+            0,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "KNUfP",
+              "name": "ar3t",
+              "fill": "#10B981",
+              "content": "↓  After the message is fully written…",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "qiemc",
+          "name": "b4",
+          "width": "fill_container",
+          "fill": "#091510",
+          "layout": "vertical",
+          "gap": 6,
+          "padding": [
+            16,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "toPaq",
+              "name": "b4t",
+              "fill": "#10B981",
+              "content": "Add a Tamper-Proof Seal",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "LkUEI",
+              "name": "b4d",
+              "fill": "#6B7280",
+              "content": "Generate a unique fingerprint of the file.\nAnyone who changes even one character will break the seal.",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "XOiC9",
+              "name": "b4tag",
+              "fill": "#10B981",
+              "content": "[ our addition — IT Act 2000 compliance ]",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 10,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "w4Uz1",
+          "name": "ar4",
+          "width": "fill_container",
+          "height": 36,
+          "padding": [
+            0,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "FLhq8",
+              "name": "ar4t",
+              "fill": "#4B5563",
+              "content": "↓  Write to disk",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "toy2T",
+          "name": "b5",
+          "width": "fill_container",
+          "fill": "#091510",
+          "layout": "vertical",
+          "gap": 6,
+          "padding": [
+            16,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "diw3u",
+              "name": "b5t",
+              "fill": "#10B981",
+              "content": "Secure .hl7 Output File",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "qUUii",
+              "name": "b5d",
+              "fill": "#6B7280",
+              "content": "One file per patient. No real identity. Sealed.",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "Mzbuw",
+              "name": "b5tag",
+              "fill": "#10B981",
+              "content": "[ our addition ]",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 10,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "EKmZb",
+          "name": "ar5",
+          "width": "fill_container",
+          "height": 36,
+          "padding": [
+            0,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "Cx0oy",
+              "name": "ar5t",
+              "fill": "#4B5563",
+              "content": "↓  At any time later…",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "wnjDs",
+          "name": "b6",
+          "width": "fill_container",
+          "fill": "#091510",
+          "layout": "vertical",
+          "gap": 6,
+          "padding": [
+            16,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "KAs2a",
+              "name": "b6t",
+              "fill": "#F59E0B",
+              "content": "Verify Nothing Was Changed",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 15,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "lc9Ie",
+              "name": "b6d",
+              "fill": "#6B7280",
+              "content": "Re-check the fingerprint. Passes or fails instantly.",
+              "fontFamily": "IBM Plex Mono",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "Q8duI",
+              "name": "b6tag",
+              "fill": "#F59E0B",
+              "content": "[ our addition — IT Act 2000 compliance ]",
+              "fontFamily": "JetBrains Mono",
+              "fontSize": 10,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "kN3Lx",
+          "name": "gapf",
+          "width": "fill_container",
+          "height": 20
+        },
+        {
+          "type": "frame",
+          "id": "HBR4U",
+          "name": "legend",
+          "width": "fill_container",
+          "fill": "#111111",
+          "gap": 20,
+          "padding": [
+            14,
+            16
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "SAXc6",
+              "name": "lg1",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "rectangle",
+                  "id": "dIWHu",
+                  "name": "dot1",
+                  "fill": "#10B981",
+                  "width": 10,
+                  "height": 10
+                },
+                {
+                  "type": "text",
+                  "id": "oMhxA",
+                  "name": "lt1",
+                  "fill": "#6B7280",
+                  "content": "our additions",
+                  "fontFamily": "IBM Plex Mono",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "cvLbQ",
+              "name": "lg2",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "rectangle",
+                  "id": "rh4bP",
+                  "name": "dot2",
+                  "fill": "#06B6D4",
+                  "width": 10,
+                  "height": 10
+                },
+                {
+                  "type": "text",
+                  "id": "Inezh",
+                  "name": "lt2",
+                  "fill": "#6B7280",
+                  "content": "original library (unchanged)",
+                  "fontFamily": "IBM Plex Mono",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "rkO0W",
+              "name": "lg3",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "rectangle",
+                  "id": "sl0pm",
+                  "name": "dot3",
+                  "fill": "#F59E0B",
+                  "width": 10,
+                  "height": 10
+                },
+                {
+                  "type": "text",
+                  "id": "qs7PR",
+                  "name": "lt3",
+                  "fill": "#6B7280",
+                  "content": "verification step",
+                  "fontFamily": "IBM Plex Mono",
+                  "fontSize": 11,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

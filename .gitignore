@@ -130,3 +130,20 @@ dmypy.json
 
 # Other files
 *.xcf
+
+# macOS metadata
+.DS_Store
+
+# Project-specific: raw MIMIC-IV source data (large + sensitive — never commit)
+dataset/
+
+# Project-specific: generated HL7 output files (contain patient data)
+output/
+
+# Project-specific: intermediate data files
+data/
+
+# Project-specific: generated PDFs and session notes
+*.pdf
+chat.md
+plan.md
