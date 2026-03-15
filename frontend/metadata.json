@@ -1,0 +1,5 @@
+{
+  "name": "HL7 Orchestrator Command",
+  "description": "A high-precision operational dashboard for HL7 message processing, anonymization, and integrity verification.",
+  "requestFramePermissions": []
+}

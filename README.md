@@ -29,7 +29,8 @@ A privacy-first, compliance-ready HL7 v2.5.1 message generation pipeline built o
     - [From PyPI (original library only)](#from-pypi-original-library-only)
     - [From source (this fork, with all additions)](#from-source-this-fork-with-all-additions)
   - [Usage](#usage)
-    - [Run the full pipeline](#run-the-full-pipeline)
+    - [Run original MIMIC-IV pipeline](#run-original-mimic-iv-pipeline)
+    - [Run generic CSV pipeline](#run-generic-csv-pipeline)
     - [Validate output integrity](#validate-output-integrity)
     - [Use the library API directly](#use-the-library-api-directly)
     - [CLI (original library)](#cli-original-library)
@@ -263,15 +264,23 @@ python setup.py install
 
 ## Usage
 
-### Run the full pipeline
+### Run original MIMIC-IV pipeline
 
 ```bash
-python main.py
-# with explicit paths:
-python main.py --data-dir dataset/ --out output/ --sample 50
+python main.py --type mimic
+# with optional parameters
+python main.py --type mimic --data-dir dataset/ --out output/mimic/ --sample 50
 ```
 
-Reads MIMIC-IV data, anonymizes patient PII, generates one HL7 v2.5.1 `ORU^R01` message per patient, signs each with a SHA-256 `ZSH` segment, and writes all files to `output/`.
+Reads the specialized 3-file MIMIC-IV dataset and generates ORU^R01 messages.
+
+### Run generic CSV pipeline
+
+```bash
+python main.py --type generic --csv dataset/indian_liver_patient.csv --out output/liver/
+```
+
+Reads any flat medical CSV and uses a configurable mapping to generate signed, anonymized HL7 messages.
 
 ### Validate output integrity
 

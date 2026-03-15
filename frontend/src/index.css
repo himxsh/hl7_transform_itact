@@ -1,0 +1,62 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=DM+Mono:wght@300;400;500&family=Tenor+Sans&family=Manrope:wght@200;300;400;500;600;700;800&display=swap');
+
+@theme {
+  --color-charcoal: #1c1b19;
+  --color-charcoal-light: #2a2825;
+  --color-gold: #b8a882;
+  --color-ok-green: #6a9e72;
+  --color-warn-amber: #c9a85c;
+  --color-ui-border: rgba(184, 168, 130, 0.2);
+
+  /* Selection Page Colors */
+  --color-primary-gold: #c1af86;
+  --color-bg-light: #faf9f7;
+  --color-neutral-dark: #171512;
+
+  --font-title: "Cormorant Garamond", serif;
+  --font-sans: "Tenor Sans", sans-serif;
+  --font-mono: "DM Mono", monospace;
+  --font-display: "Manrope", sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-charcoal text-[#e2e2e2] font-sans antialiased;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply bg-charcoal-light/40 border border-gold/15 backdrop-blur-md;
+  }
+  
+  .technical-data {
+    @apply font-mono;
+  }
+
+  .p-bar {
+    @apply h-1 rounded-full;
+  }
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1c1b19;
+}
+::-webkit-scrollbar-thumb {
+  background: #b8a882;
+  border-radius: 3px;
+}

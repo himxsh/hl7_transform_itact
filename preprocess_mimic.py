@@ -54,10 +54,11 @@ D_LABITEMS_COLS = ["itemid", "label", "fluid", "category"]
 # Core functions
 # ---------------------------------------------------------------------------
 
-def load_patients(data_dir: Path, sample_size: int = PATIENT_SAMPLE_SIZE):
+def load_patients(data_dir: Path, sample_size: int = PATIENT_SAMPLE_SIZE,
+                  random_seed=None):
     """
-    Load patients.csv.gz and return a sampled patient DataFrame plus the
-    set of sampled subject_ids.
+    Load patients.csv.gz and return a randomly sampled patient DataFrame
+    plus the set of sampled subject_ids.
 
     Parameters
     ----------
@@ -65,6 +66,9 @@ def load_patients(data_dir: Path, sample_size: int = PATIENT_SAMPLE_SIZE):
         Directory that contains the MIMIC-IV .csv.gz files.
     sample_size : int
         Number of distinct patients to select.
+    random_seed : int or None
+        Seed for reproducibility.  ``None`` (default) gives a different
+        random draw on every call.
 
     Returns
     -------
@@ -77,9 +81,14 @@ def load_patients(data_dir: Path, sample_size: int = PATIENT_SAMPLE_SIZE):
     patients = pd.read_csv(path, usecols=PATIENTS_COLS)
     logger.info("  Total patients loaded: %d", len(patients))
 
-    sample_ids = set(patients["subject_id"].unique()[:sample_size])
+    all_ids = patients["subject_id"].unique()
+    n = min(sample_size, len(all_ids))
+    rng = pd.Series(all_ids).sample(n=n, random_state=random_seed)
+    sample_ids = set(rng.values)
     patients = patients[patients["subject_id"].isin(sample_ids)].copy()
-    logger.info("  Sampled %d patients (subject_ids selected)", len(patients))
+    logger.info(
+        "  Randomly sampled %d patients (seed=%s)", len(sample_ids), random_seed
+    )
 
     return patients, sample_ids
 
@@ -189,7 +198,8 @@ def merge_datasets(patients: pd.DataFrame,
 
 def preprocess(data_dir: str = str(DEFAULT_DATA_DIR),
                sample_size: int = PATIENT_SAMPLE_SIZE,
-               out_dir: str = None) -> pd.DataFrame:
+               out_dir: str = None,
+               random_seed=None) -> pd.DataFrame:
     """
     Main entry point.  Loads, streams, merges, and optionally saves the
     MIMIC-IV subset.
@@ -200,6 +210,8 @@ def preprocess(data_dir: str = str(DEFAULT_DATA_DIR),
     sample_size : int
     out_dir : str, optional
         If provided, saves ``mimic_subset.csv.gz`` here.
+    random_seed : int or None
+        Forwarded to ``load_patients``.  ``None`` = different draw each run.
 
     Returns
     -------
@@ -208,7 +220,8 @@ def preprocess(data_dir: str = str(DEFAULT_DATA_DIR),
     """
     data_path = Path(data_dir)
 
-    patients, sample_ids = load_patients(data_path, sample_size)
+    patients, sample_ids = load_patients(data_path, sample_size,
+                                         random_seed=random_seed)
     d_labitems = load_d_labitems(data_path)
     labevents = stream_labevents(data_path, sample_ids)
     merged = merge_datasets(patients, labevents, d_labitems)
