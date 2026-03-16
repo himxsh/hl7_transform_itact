@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, BookOpen, Scale, Shield, Heart, Globe } from 'lucide-react';
 import Header from './Header';
 
 export default function LandingPage() {
@@ -112,6 +112,32 @@ export default function LandingPage() {
           </div>
         </div>
 
+        {/* Regulatory Coverage Stats */}
+        <section className="max-w-[1440px] mx-auto px-6 lg:px-12 py-16 border-b border-gold/10">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+            {[
+              { stat: '20+', label: 'Legal Sections Mapped', sub: 'IT Act + DPDP + GDPR' },
+              { stat: '14', label: 'Offences Catalogued', sub: 'IT Act §43–§72A' },
+              { stat: '9', label: 'Case Studies', sub: 'Landmark Judgments' },
+              { stat: '5', label: 'Course Units', sub: 'Full Syllabus Coverage' },
+              { stat: '3', label: 'Data Protection Laws', sub: 'DPDP · IT Act · GDPR' },
+            ].map((item, idx) => (
+              <motion.div
+                key={item.label}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.08 }}
+                className="text-center"
+              >
+                <div className="font-title text-4xl lg:text-5xl text-gold mb-2">{item.stat}</div>
+                <div className="font-sans text-sm font-medium text-neutral-dark mb-1">{item.label}</div>
+                <div className="font-mono text-[9px] uppercase tracking-widest text-slate-400">{item.sub}</div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+
         {/* Pipeline Grid */}
         <section id="pipeline" className="max-w-[1440px] mx-auto px-6 lg:px-12 py-24 border-b border-gold/10">
           <div className="flex flex-col mb-16">
@@ -179,6 +205,50 @@ export default function LandingPage() {
 
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Course Unit Coverage */}
+        <section className="max-w-[1440px] mx-auto px-6 lg:px-12 py-24 border-b border-gold/10">
+          <div className="flex flex-col mb-16 text-center items-center">
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="font-title text-4xl font-light mb-4"
+            >
+              Course <span className="italic font-title text-gold">Coverage</span>
+            </motion.h2>
+            <div className="w-24 h-px bg-gold"></div>
+            <p className="font-sans text-slate-500 mt-6 max-w-xl leading-relaxed">
+              Comprehensive mapping to all 5 units of ECE-4272: IT Act and Data Protection
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            {[
+              { unit: 'I', title: 'Foundations', desc: 'Data definitions, privacy principles, legislative timeline', icon: <BookOpen size={24} className="text-gold" />, href: '/legal-framework' },
+              { unit: 'II', title: 'IT Act 2000', desc: 'Digital signatures, e-governance, cyber offences', icon: <Scale size={24} className="text-gold" />, href: '/digital-signatures' },
+              { unit: 'III', title: 'DPDP Act', desc: 'Personal data, consent, cross-border transfers', icon: <Shield size={24} className="text-gold" />, href: '/data-lifecycle' },
+              { unit: 'IV', title: 'GDPR', desc: 'Data subject rights, penalties, comparison', icon: <Globe size={24} className="text-gold" />, href: '/gdpr' },
+              { unit: 'V', title: 'Healthcare', desc: 'NeHA, SeHA, DISHA, data ownership', icon: <Heart size={24} className="text-gold" />, href: '/healthcare' },
+            ].map((item, idx) => (
+              <motion.a
+                key={item.unit}
+                href={item.href}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.08 }}
+                className="bg-white border border-gold/10 p-8 group hover:border-gold/30 transition-all cursor-pointer block"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="font-mono text-[10px] text-gold bg-gold/10 px-2 py-1 border border-gold/20">UNIT {item.unit}</span>
+                </div>
+                <div className="mb-4">{item.icon}</div>
+                <h3 className="font-title text-xl mb-2 group-hover:text-gold transition-colors">{item.title}</h3>
+                <p className="font-sans text-[12px] text-slate-500 leading-relaxed">{item.desc}</p>
+              </motion.a>
+            ))}
           </div>
         </section>
 
