@@ -7,11 +7,11 @@ export default function LandingPage() {
   const navigate = useNavigate();
   return (
     <div className="bg-[#f7f7f6] text-[#1c1a16] font-sans selection:bg-gold/30">
-      <Header />
+      <Header activeTab="home" />
 
-      <main className="pt-24">
+      <main className="pt-20">
         {/* Hero Section */}
-        <section className="max-w-[1440px] mx-auto px-6 lg:px-12 py-20 lg:py-32 grid lg:grid-cols-12 gap-12 border-b border-gold/10">
+        <section className="max-w-[1440px] mx-auto px-6 lg:px-12 pt-12 pb-20 lg:pt-20 lg:pb-32 grid lg:grid-cols-12 gap-12 border-b border-gold/10">
           <div className="lg:col-span-8 flex flex-col justify-center">
             <motion.span
               initial={{ opacity: 0, y: 20 }}
@@ -53,7 +53,10 @@ export default function LandingPage() {
               >
                 EXPLORE PIPELINE
               </button>
-              <button className="bg-transparent border border-gold/20 px-10 py-4 font-mono text-xs uppercase tracking-widest hover:bg-gold/5 transition-all">
+              <button
+                onClick={() => navigate('/compliance')}
+                className="bg-transparent border border-gold/20 px-10 py-4 font-mono text-xs uppercase tracking-widest hover:bg-gold/5 transition-all"
+              >
                 View Compliance
               </button>
             </motion.div>
@@ -115,24 +118,24 @@ export default function LandingPage() {
             <h2 className="font-title text-4xl font-light mb-4">The Processing Cycle</h2>
             <div className="w-78 h-px bg-gold"></div>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-0 border border-gold/10">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-0 border border-black">
             <PipelineCard
-              phase="01"
+              phase="1"
               title="Preprocessing"
               desc="Structural validation and noise reduction for raw clinical message streams."
             />
             <PipelineCard
-              phase="02"
+              phase="2"
               title="Anonymizer"
               desc="Dynamic PII detection and masking aligned with international privacy mandates."
             />
             <PipelineCard
-              phase="03"
+              phase="3"
               title="HL7 Engine"
               desc="Multi-version mapping and canonical transformation of medical data assets."
             />
             <PipelineCard
-              phase="04"
+              phase="4"
               title="Sealing"
               desc="Cryptographic validation and immutable audit logging for full data lineage."
               isLast
@@ -140,75 +143,40 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Architecture Section */}
-        <section id="architecture" className="bg-charcoal text-slate-100 py-24 border-b border-white/5">
-          <div className="max-w-[1440px] mx-auto px-6 lg:px-12 grid lg:grid-cols-2 gap-20">
-            <div className="flex flex-col justify-center">
+        {/* Data Interoperability Section (Replacing Architecture & old Database) */}
+        <section id="database" className="bg-charcoal text-slate-100 py-24 border-b border-white/5">
+          <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
+            <div className="flex flex-col mb-20 text-center">
               <motion.h2
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                className="font-title text-5xl font-light mb-8 leading-tight"
+                className="font-title text-5xl font-light mb-4"
               >
-                Engineered for <br /><span className="italic font-title text-gold">Total Observability</span>
+                Universal Data <span className="italic font-title text-gold">Interoperability</span>
               </motion.h2>
-              <p className="font-sans text-slate-400 mb-8 leading-relaxed">
-                A modular microservices architecture designed to scale with enterprise HL7 throughput. Every transaction is tracked, hashed, and recorded with millisecond precision.
+              <div className="w-24 h-px bg-gold mx-auto"></div>
+              <p className="font-sans text-slate-400 mt-8 max-w-2xl mx-auto leading-relaxed">
+                Seamlessly ingest diverse clinical data sources. Our engine maps legacy structures to compliant HL7 v2 formats with automated schema detection.
               </p>
-              <ul className="font-mono text-[11px] uppercase tracking-[0.2em] space-y-4">
-                <li className="flex items-center gap-3">
-                  <span className="w-1 h-1 bg-gold"></span> High availability Kafka clusters
-                </li>
-                <li className="flex items-center gap-3">
-                  <span className="w-1 h-1 bg-gold"></span> Stateless processing nodes
-                </li>
-                <li className="flex items-center gap-3">
-                  <span className="w-1 h-1 bg-gold"></span> Distributed sealing protocol
-                </li>
-              </ul>
             </div>
-            <div className="bg-black/40 border border-white/10 p-8 font-mono text-sm leading-relaxed overflow-x-auto">
-              <div className="flex gap-2 mb-6">
-                <div className="w-2 h-2 rounded-full bg-red-500/50"></div>
-                <div className="w-2 h-2 rounded-full bg-yellow-500/50"></div>
-                <div className="w-2 h-2 rounded-full bg-green-500/50"></div>
-              </div>
-              <pre className="text-slate-300">
-                <span className="text-gold">class</span> <span className="text-blue-400">HL7Orchestrator</span>:<br />
-                &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-slate-500"># Core Processing Sequence</span><br />
-                &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-gold">async def</span> <span className="text-blue-400">process_stream</span>(self, message):<br />
-                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;header = await self.parse_msh(message)<br />
-                <br />
-                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-gold">if</span> header.compliance == <span className="text-green-400">'DPDP_2023'</span>:<br />
-                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;anonymized = self.anonymizer.mask(message)<br />
-                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;sealed_pkg = await self.sealer.seal(anonymized)<br />
-                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-gold">return</span> await self.db.commit(sealed_pkg)<br />
-                <br />
-                &nbsp;&nbsp;&nbsp;&nbsp;<span className="text-gold">def</span> <span className="text-blue-400">verify_integrity</span>(self, hash):<br />
-                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span className="text-gold">return</span> self.ledger.validate(hash)
-              </pre>
-            </div>
-          </div>
-        </section>
 
-        {/* Database Section */}
-        <section id="database" className="max-w-[1440px] mx-auto px-6 lg:px-12 py-24 border-b border-gold/10">
-          <h2 className="font-title text-4xl font-light mb-16 text-center">Data Interoperability</h2>
-          <div className="grid md:grid-cols-2 gap-px bg-gold/10 border border-gold/10">
-            <div className="bg-[#f7f7f6] p-12">
-              <span className="font-mono text-[10px] tracking-widest uppercase mb-4 block text-gold">Schema Type A</span>
-              <h3 className="font-title text-3xl font-light mb-6">MIMIC-IV Mode</h3>
-              <p className="font-sans text-slate-500 mb-8">Native integration for the Medical Information Mart for Intensive Care version IV. Specialized transformations for critical care datasets.</p>
-              <div className="h-48 bg-gold/5 flex items-end p-4 border border-dashed border-gold/20">
-                <div className="w-full h-full flex items-center justify-center font-mono text-[10px] uppercase text-gold/40">Data Visualization Abstract</div>
+            <div className="grid md:grid-cols-2 gap-px bg-white/10 border border-white/10">
+              <div className="bg-charcoal p-16 group transition-colors hover:bg-white/5">
+                <span className="font-mono text-[10px] tracking-[0.3em] uppercase mb-4 block text-gold">Schema Type A</span>
+                <h3 className="font-title text-4xl font-light mb-8 group-hover:italic transition-all">MIMIC-IV Mode</h3>
+                <p className="font-sans text-slate-400 leading-relaxed max-w-md">
+                  Native integration for the Medical Information Mart for Intensive Care version IV. Specialized transformations for secondary use of critical care datasets.
+                </p>
+
               </div>
-            </div>
-            <div className="bg-[#f7f7f6] p-12">
-              <span className="font-mono text-[10px] tracking-widest uppercase mb-4 block text-gold">Schema Type B</span>
-              <h3 className="font-title text-3xl font-light mb-6">Generic CSV Engine</h3>
-              <p className="font-sans text-slate-500 mb-8">Flexible ingestion for legacy tabular systems. Auto-mapping clinical variables to standard HL7 v2 structures.</p>
-              <div className="h-48 bg-gold/5 flex items-end p-4 border border-dashed border-gold/20">
-                <div className="w-full h-full flex items-center justify-center font-mono text-[10px] uppercase text-gold/40">Data Visualization Abstract</div>
+              <div className="bg-charcoal p-16 group transition-colors hover:bg-white/5">
+                <span className="font-mono text-[10px] tracking-[0.3em] uppercase mb-4 block text-gold">Schema Type B</span>
+                <h3 className="font-title text-4xl font-light mb-8 group-hover:italic transition-all">Generic CSV Engine</h3>
+                <p className="font-sans text-slate-400 leading-relaxed max-w-md">
+                  Flexible ingestion for legacy tabular systems. Auto-mapping clinical variables to standard HL7 v2 structures through declarative JSON registries.
+                </p>
+
               </div>
             </div>
           </div>
@@ -227,7 +195,13 @@ export default function LandingPage() {
                 >
                   <h3 className="font-title text-3xl font-light mb-4 tracking-tight">DPDP Act 2023 Compliance</h3>
                   <p className="font-sans text-slate-500 leading-relaxed max-w-md">Strict adherence to Digital Personal Data Protection mandates, featuring automated 'right to erasure' and purpose limitation protocols.</p>
-                  <span className="font-mono text-[10px] text-gold/60 mt-4 block">§8: DUTIES OF DATA FIDUCIARY</span>
+                  <span className="font-mono text-[10px] text-gold/60 mt-4 block uppercase tracking-wider">§8: Duties of Data Fiduciary</span>
+                  <button
+                    onClick={() => navigate('/compliance')}
+                    className="mt-8 px-6 py-3 border border-gold/30 text-gold font-mono text-[10px] uppercase tracking-widest hover:bg-gold hover:text-charcoal transition-all"
+                  >
+                    Read More
+                  </button>
                 </motion.div>
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
@@ -237,7 +211,13 @@ export default function LandingPage() {
                 >
                   <h3 className="font-title text-3xl font-light mb-4 tracking-tight">IT Act 2000 Validation</h3>
                   <p className="font-sans text-slate-500 leading-relaxed max-w-md">Governance framework for electronic records and digital signatures, ensuring legal validity for processed clinical reports.</p>
-                  <span className="font-mono text-[10px] text-gold/60 mt-4 block">§43: PENALTY FOR DAMAGE TO COMPUTER SYSTEM</span>
+                  <span className="font-mono text-[10px] text-gold/60 mt-4 block uppercase tracking-wider">§43: Penalty for Damage to Computer System</span>
+                  <button
+                    onClick={() => navigate('/compliance')}
+                    className="mt-8 px-6 py-3 border border-gold/30 text-gold font-mono text-[10px] uppercase tracking-widest hover:bg-gold hover:text-charcoal transition-all"
+                  >
+                    Read More
+                  </button>
                 </motion.div>
               </div>
             </div>
@@ -262,26 +242,23 @@ export default function LandingPage() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-charcoal text-white pt-20 pb-12 border-t border-white/5">
+      <footer className="bg-charcoal text-white pt-15 pb-15 border-t border-white/5">
         <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <div className="grid lg:grid-cols-12 gap-16 mb-20">
+          <div className="grid lg:grid-cols-12 gap-16">
             <div className="lg:col-span-5">
               <span className="font-title text-3xl font-light uppercase tracking-tighter mb-6 block">
                 HL7 <span className="italic lowercase font-title">Orchestrator</span>
               </span>
               <p className="font-sans text-slate-400 max-w-sm mb-10 leading-relaxed">
-                A definitive platform for clinical data processing, bridging the gap between legacy medical infrastructure and modern data privacy standards.
+                This project was developed as an exhibition for the IT Act and Data Protection for the ITADP course under the guidance of Dr. Abhishek Sharma (LNMIIT). This project is not intended for commercial purposes.
               </p>
             </div>
-            <div className="lg:col-span-7 grid grid-cols-2 md:grid-cols-3 gap-8">
-              <FooterColumn title="Modules" items={['Pipeline', 'Anonymizer', 'Engine']} />
-              <FooterColumn title="Resources" items={['API Docs', 'Architecture', 'Compliance Guide']} />
-              <FooterColumn title="Legal" items={['Privacy Policy', 'Terms of Use', 'Security Audit']} />
+            <div className="lg:col-span-7 flex justify-end">
+              <div className="grid grid-cols-2 gap-12 lg:gap-24">
+                <FooterColumn title="Original Repo" items={['HL7_transform']} />
+                <FooterColumn title="Contact" items={['Email', 'Linkedin', 'Github']} />
+              </div>
             </div>
-          </div>
-          <div className="flex flex-col md:flex-row justify-between items-center pt-8 border-t border-white/5 font-mono text-[10px] uppercase tracking-widest text-slate-600">
-            <span>© 2024 HL7 Orchestrator. All rights reserved.</span>
-            <span className="mt-4 md:mt-0">Designed for Clinical Excellence</span>
           </div>
         </div>
       </footer>
@@ -290,9 +267,9 @@ export default function LandingPage() {
 }
 
 const PipelineCard = ({ phase, title, desc, isLast = false }: { phase: string, title: string, desc: string, isLast?: boolean }) => (
-  <div className={`relative group p-10 border-neutral-border transition-colors hover:bg-gold/5 ${!isLast ? 'border-r' : ''} border-b lg:border-b-0`}>
+  <div className={`relative group p-10 border-black transition-colors hover:bg-gold/5 ${!isLast ? 'border-r' : ''} border-b lg:border-b-0`}>
     <div className="absolute top-0 left-0 w-full h-0 bg-gold transition-all duration-300 group-hover:h-1"></div>
-    <span className="font-mono text-[10px] text-gold block mb-8">PHASE_{phase}</span>
+    <span className="font-mono text-[15px] text-gold block mb-8">PHASE {phase}</span>
     <h3 className="font-title text-2xl font-light mb-4 tracking-tight uppercase">{title}</h3>
     <p className="font-sans text-sm text-slate-500 leading-relaxed">{desc}</p>
   </div>

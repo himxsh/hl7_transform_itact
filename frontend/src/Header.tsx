@@ -3,14 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Menu } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { motion } from 'motion/react';
 
 interface HeaderProps {
-  activeTab?: 'pipeline' | 'architecture' | 'database' | 'compliance';
+  activeTab?: 'home' | 'pipeline' | 'compliance' | 'architecture';
 }
 
 export default function Header({ activeTab }: HeaderProps) {
+  const navItems = [
+    { id: 'home', label: 'Home', path: '/' },
+    { id: 'pipeline', label: 'Pipeline', path: '/selection' },
+    { id: 'architecture', label: 'Architecture', path: '/architecture' },
+    { id: 'compliance', label: 'Compliance', path: '/compliance' },
+  ];
+
   return (
     <header className="fixed top-0 w-full z-50 bg-[#f7f7f6]/80 backdrop-blur-md border-b border-gold/10">
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-5 flex items-center justify-between">
@@ -20,34 +27,27 @@ export default function Header({ activeTab }: HeaderProps) {
           </span>
         </Link>
         <nav className="hidden md:flex items-center gap-12 font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500">
-          <Link
-            className={`hover:text-gold transition-colors ${activeTab === 'pipeline' ? 'text-gold border-b border-gold pb-1' : ''}`}
-            to="/"
-          >
-            Pipeline
-          </Link>
-          <a
-            className={`hover:text-gold transition-colors ${activeTab === 'architecture' ? 'text-gold border-b border-gold pb-1' : ''}`}
-            href="#architecture"
-          >
-            Architecture
-          </a>
-          <Link
-            className={`hover:text-gold transition-colors ${activeTab === 'database' ? 'text-gold border-b border-gold pb-1' : ''}`}
-            to="/selection"
-          >
-            Database
-          </Link>
-          <a
-            className={`hover:text-gold transition-colors ${activeTab === 'compliance' ? 'text-gold border-b border-gold pb-1' : ''}`}
-            href="#compliance"
-          >
-            Compliance
-          </a>
+          {navItems.map((item) => (
+            <Link
+              key={item.id}
+              to={item.path}
+              className={`relative py-1 transition-colors hover:text-gold ${
+                activeTab === item.id ? 'text-gold' : ''
+              }`}
+            >
+              {item.label}
+              {activeTab === item.id && (
+                <motion.div
+                  layoutId="header-underline"
+                  className="absolute bottom-0 left-0 right-0 h-px bg-gold"
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+            </Link>
+          ))}
         </nav>
         <div className="flex items-center gap-6">
-          <span className="font-mono text-[10px] px-3 py-1 border border-gold text-gold tracking-tighter uppercase">v2.5.1</span>
-
+          <span className="font-mono text-[10px] px-3 py-1 border border-gold text-gold tracking-tighter uppercase">v0.0.1</span>
         </div>
       </div>
     </header>

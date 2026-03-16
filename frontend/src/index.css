@@ -4,13 +4,13 @@
 @theme {
   --color-charcoal: #1c1b19;
   --color-charcoal-light: #2a2825;
-  --color-gold: #b8a882;
+  --color-gold: #9e8a5d;
   --color-ok-green: #6a9e72;
   --color-warn-amber: #c9a85c;
-  --color-ui-border: rgba(184, 168, 130, 0.2);
+  --color-ui-border: rgba(158, 138, 93, 0.2);
 
   /* Selection Page Colors */
-  --color-primary-gold: #c1af86;
+  --color-primary-gold: #a69165;
   --color-bg-light: #faf9f7;
   --color-neutral-dark: #171512;
 
@@ -21,6 +21,9 @@
 }
 
 @layer base {
+  html {
+    scrollbar-gutter: stable;
+  }
   body {
     @apply bg-charcoal text-[#e2e2e2] font-sans antialiased;
   }
@@ -57,6 +60,6 @@
   background: #1c1b19;
 }
 ::-webkit-scrollbar-thumb {
-  background: #b8a882;
+  background: #9e8a5d;
   border-radius: 3px;
 }

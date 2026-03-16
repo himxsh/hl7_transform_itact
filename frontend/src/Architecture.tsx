@@ -1,0 +1,198 @@
+import { motion } from 'motion/react';
+import {
+  Database,
+  ArrowRight,
+  ShieldCheck,
+  Cpu,
+  Binary,
+  FileCode,
+  Activity,
+  Cloud,
+  Layers,
+  Search,
+  Zap
+} from 'lucide-react';
+import Header from './Header';
+
+export default function Architecture() {
+  const stages = [
+    {
+      id: 'ingestion',
+      title: 'Data Ingestion',
+      type: 'original',
+      icon: <Database className="text-primary-gold" size={24} />,
+      items: ['MIMIC-IV Relational DB', 'Universal CSV Ingestion'],
+      description: 'Handles raw clinical data sources and initializes stream contexts.'
+    },
+    {
+      id: 'pre-processing',
+      title: 'Schema Intelligence',
+      type: 'addition',
+      icon: <Layers className="text-primary-gold" size={24} />,
+      items: ['Dynamic Header Mapping', 'Clinical Segment Grouping'],
+      description: 'Translates arbitrary CSV headers into standardized internal schema objects.'
+    },
+    {
+      id: 'privacy',
+      title: 'Anonymization Layer',
+      type: 'addition',
+      icon: <ShieldCheck className="text-primary-gold" size={24} />,
+      items: ['PII Masking', 'Deterministic Shifting (DPDP)'],
+      description: 'Secures Patient Identification (PID) data before any downstream processing.'
+    },
+    {
+      id: 'core',
+      title: 'HL7 Engine',
+      type: 'original',
+      icon: <Cpu className="text-primary-gold" size={24} />,
+      items: ['HL7 v2.5.1 Generator', 'Segment Templating'],
+      description: 'The core transformation engine from the original hl7_transform codebase.'
+    },
+    {
+      id: 'integrity',
+      title: 'Security & Integrity',
+      type: 'addition',
+      icon: <Binary className="text-primary-gold" size={24} />,
+      items: ['SHA-256 Hashing (IT Act)', 'Cryptographic Auditing'],
+      description: 'Ensures non-repudiation and data integrity for cross-hospital transfers.'
+    },
+
+    {
+      id: 'output',
+      title: 'Output Orchestrator',
+      type: 'addition',
+      icon: <Activity className="text-primary-gold" size={24} />,
+      items: ['ER7-formatted Streams', 'Real-time Dashboards'],
+      description: 'Aggregates processed segments into the final HL7 transmission stream.'
+    }
+  ];
+
+  return (
+    <div className="min-h-screen bg-bg-light text-neutral-dark font-sans selection:bg-primary-gold/30">
+      <Header activeTab="architecture" />
+
+      <main className="max-w-[1200px] mx-auto px-6 py-24 flex flex-col items-center">
+        {/* Header */}
+        <div className="text-center mb-20 max-w-2xl mx-auto">
+
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="font-title text-5xl lg:text-7xl leading-[0.9] tracking-tighter mb-8"
+          >
+            Hybrid <span className="italic font-title text-primary-gold">Architecture</span>
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="font-sans text-neutral-dark/60 leading-relaxed"
+          >
+            A high-fidelity visualization of the data pipeline, showing the integration of the original HL7 transformation engine with our modern security and privacy layers.
+          </motion.p>
+        </div>
+
+
+        {/* Flowchart Zig-Zag */}
+        <div className="relative w-full max-w-5xl">
+          {stages.map((stage, idx) => (
+            <div key={stage.id} className="relative flex flex-col items-center w-full">
+              {/* Stage Container */}
+              <div className={`flex w-full mb-4 px-4 ${idx % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
+                <motion.div
+                  initial={{ opacity: 0, x: idx % 2 === 0 ? -40 : 40 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.1, duration: 0.6 }}
+                  className={`w-full max-w-[440px] bg-white border p-10 rounded-[2.5rem] relative group transition-all duration-700
+                    ${stage.type === 'addition'
+                      ? 'border-primary-gold shadow-[0_20px_60px_-20px_rgba(193,175,134,0.3)] ring-1 ring-primary-gold/10'
+                      : 'border-primary-gold/10 hover:border-primary-gold/30 hover:shadow-xl'}`}
+                >
+                  {/* Addition Badge */}
+                  {stage.type === 'addition' && (
+                    <div className="absolute -top-3 right-10 bg-primary-gold text-[#1c1a16] font-mono text-[8px] px-4 py-1.5 rounded-full uppercase tracking-widest font-bold shadow-lg ring-4 ring-white">
+                      Enhanced Integration
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-8">
+                    <div className={`w-16 h-16 rounded-[1.5rem] border flex items-center justify-center transition-all duration-700 shrink-0
+                      ${stage.type === 'addition' ? 'bg-primary-gold/10 border-primary-gold/30 rotate-3 group-hover:rotate-12' : 'bg-bg-light border-primary-gold/10 group-hover:bg-primary-gold/5 -rotate-3 group-hover:rotate-0'}`}
+                    >
+                      {stage.icon}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-title text-2xl text-neutral-dark mb-1">{stage.title}</h3>
+                      <p className="font-sans text-[11px] text-neutral-dark/40 mb-4 leading-relaxed">{stage.description}</p>
+
+                      <div className="flex flex-wrap gap-2">
+                        {stage.items.map(item => (
+                          <span key={item} className={`font-mono text-[8px] px-3 py-1 border rounded-full tracking-wide transition-all
+                            ${stage.type === 'addition'
+                              ? 'border-primary-gold/30 text-primary-gold bg-primary-gold/5'
+                              : 'border-neutral-dark/10 text-neutral-dark/50 bg-neutral-dark/[0.02]'}`}
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+
+              {/* Cursive S-Curve Connector */}
+              {idx < stages.length - 1 && (
+                <div className="h-32 w-full relative -mt-6 -mb-6 pointer-events-none">
+                  <svg width="100%" height="100%" viewBox="0 0 1000 120" fill="none" preserveAspectRatio="none" className="overflow-visible">
+                    <motion.path
+                      d={idx % 2 === 0
+                        ? "M 220 0 C 220 60, 780 60, 780 120"
+                        : "M 780 0 C 780 60, 220 60, 220 120"}
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeDasharray="10 10"
+                      className="text-primary-gold"
+                      initial={{ pathLength: 0, opacity: 0 }}
+                      whileInView={{ pathLength: 1, opacity: 0.3 }}
+                      viewport={{ once: true, margin: "-50px" }}
+                      transition={{ duration: 1.5, ease: "easeInOut" }}
+                    />
+                  </svg>
+                  <div className={`absolute bottom-0 ${idx % 2 === 0 ? 'right-[22%]' : 'left-[22%]'} -mb-4 text-primary-gold/40`}>
+                    <ArrowRight className="rotate-90 scale-125" />
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Technical Summary */}
+        <div className="mt-32 grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+          <div className="border border-primary-gold/10 p-10 rounded-[2.5rem] bg-white/30 backdrop-blur-sm">
+            <h4 className="font-title text-xl mb-4">Original Logic</h4>
+            <p className="font-sans text-[11px] text-neutral-dark/50 leading-relaxed">
+              Based on core Python transformation scripts handling CSV grouping and HL7 serialization.
+            </p>
+          </div>
+          <div className="border border-primary-gold/20 p-10 rounded-[2.5rem] bg-primary-gold/[0.02] relative group">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-primary-gold/5 -mr-8 -mt-8 rounded-full group-hover:scale-150 transition-transform duration-700" />
+            <h4 className="font-title text-xl mb-4 text-[#1c1a16]">Privacy Layer</h4>
+            <p className="font-sans text-[11px] text-neutral-dark/70 leading-relaxed">
+              Security middleware inserted between ingestion and transformation for DPDP compliance.
+            </p>
+          </div>
+          <div className="border border-primary-gold/10 p-10 rounded-[2.5rem] bg-white/30 backdrop-blur-sm">
+            <h4 className="font-title text-xl mb-4">Security Audit</h4>
+            <p className="font-sans text-[11px] text-neutral-dark/50 leading-relaxed">
+              Automated checksum and integrity verification for every processed clinical message.
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
