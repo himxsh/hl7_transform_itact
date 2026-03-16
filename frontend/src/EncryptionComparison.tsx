@@ -35,7 +35,7 @@ export default function EncryptionComparison() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:8000/api/encryption-comparison');
+      const res = await fetch('/api/encryption-comparison');
       const json = await res.json();
       setData(json.results || []);
     } catch (e) {

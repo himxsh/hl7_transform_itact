@@ -21,6 +21,10 @@ import ConsentManagement from './ConsentManagement';
 import EncryptionComparison from './EncryptionComparison';
 import AuditLog from './AuditLog';
 import BreachDetection from './BreachDetection';
+import ComplianceScore from './ComplianceScore';
+import DataLineagePage from './DataLineagePage';
+import RiskAssessment from './RiskAssessment';
+import AccessControl from './AccessControl';
 
 export default function App() {
   return (
@@ -42,6 +46,10 @@ export default function App() {
       <Route path="/encryption" element={<EncryptionComparison />} />
       <Route path="/audit-log" element={<AuditLog />} />
       <Route path="/breach-detection" element={<BreachDetection />} />
+      <Route path="/compliance-score" element={<ComplianceScore />} />
+      <Route path="/data-lineage" element={<DataLineagePage />} />
+      <Route path="/risk-assessment" element={<RiskAssessment />} />
+      <Route path="/access-control" element={<AccessControl />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

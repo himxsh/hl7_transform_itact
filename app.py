@@ -12,6 +12,10 @@ from hl7_transform.integrity import IntegrityManager
 from hl7_transform.encryption import EncryptionComparator
 from hl7_transform.audit_logger import AuditLogger
 from hl7_transform.breach_detector import BreachDetector
+from hl7_transform.compliance_scorer import ComplianceScorer
+from hl7_transform.data_lineage import DataLineageTracker
+from hl7_transform.risk_assessment import RiskAssessor
+from hl7_transform.access_control import AccessControlSimulator
 from preprocess_mimic import preprocess
 import pandas as pd
 import json
@@ -35,6 +39,10 @@ OUT_DIR = "output"
 audit_logger = AuditLogger()
 encryption_comparator = EncryptionComparator()
 breach_detector = BreachDetector(output_dir=OUT_DIR)
+compliance_scorer = ComplianceScorer()
+data_lineage = DataLineageTracker()
+risk_assessor = RiskAssessor()
+access_control = AccessControlSimulator()
 
 # Cache for latest encryption comparison results
 _latest_encryption_results: list = []
@@ -297,6 +305,64 @@ async def run_breach_scan():
         )
 
     return results
+
+# ---------------------------------------------------------------
+# Compliance Score Endpoint
+# ---------------------------------------------------------------
+
+@app.get("/api/compliance-score")
+async def get_compliance_score():
+    """Calculate real-time compliance score across all pipeline controls."""
+    return compliance_scorer.score(
+        has_anonymizer=True,
+        has_integrity=True,
+        has_encryption=True,
+        has_audit_log=True,
+        has_breach_detector=True,
+        output_dir=OUT_DIR,
+    )
+
+# ---------------------------------------------------------------
+# Data Lineage Endpoints
+# ---------------------------------------------------------------
+
+@app.get("/api/data-lineage")
+async def get_data_lineage():
+    """Return the complete data lineage graph."""
+    return data_lineage.get_lineage()
+
+@app.get("/api/data-lineage/{field_name}")
+async def get_field_lineage(field_name: str):
+    """Trace lineage for a specific field."""
+    return data_lineage.get_field_lineage(field_name)
+
+# ---------------------------------------------------------------
+# Risk Assessment Endpoint
+# ---------------------------------------------------------------
+
+@app.get("/api/risk-assessment")
+async def get_risk_assessment():
+    """Return the complete risk assessment matrix."""
+    return risk_assessor.assess()
+
+# ---------------------------------------------------------------
+# Access Control Endpoints
+# ---------------------------------------------------------------
+
+@app.get("/api/access-control")
+async def get_access_control():
+    """Return all RBAC roles and permissions."""
+    return access_control.get_roles()
+
+@app.get("/api/access-control/matrix")
+async def get_access_matrix():
+    """Return the roles × resources access matrix."""
+    return access_control.get_access_matrix()
+
+@app.get("/api/access-control/check")
+async def check_access(role: str, resource: str, action: str = "read"):
+    """Check if a role has access to a resource."""
+    return access_control.check_access(role, resource, action)
 
 if __name__ == "__main__":
     import uvicorn

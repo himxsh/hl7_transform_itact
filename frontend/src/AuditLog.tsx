@@ -52,7 +52,7 @@ export default function AuditLog() {
       const params = new URLSearchParams();
       if (filter !== 'all') params.set('event_type', filter);
       params.set('limit', '200');
-      const res = await fetch(`http://localhost:8000/api/audit-log?${params}`);
+      const res = await fetch(`/api/audit-log?${params}`);
       const json = await res.json();
       setEntries(json.entries || []);
       setStats(json.stats || null);
@@ -65,7 +65,7 @@ export default function AuditLog() {
 
   const clearLog = async () => {
     try {
-      await fetch('http://localhost:8000/api/audit-log/clear', { method: 'POST' });
+      await fetch('/api/audit-log/clear', { method: 'POST' });
       fetchData();
     } catch {}
   };

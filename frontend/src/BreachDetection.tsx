@@ -38,7 +38,7 @@ export default function BreachDetection() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:8000/api/breach-scan', { method: 'POST' });
+      const res = await fetch('/api/breach-scan', { method: 'POST' });
       const json = await res.json();
       setResult(json);
     } catch {

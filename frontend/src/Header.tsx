@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
 
-type TabId = 'home' | 'pipeline' | 'architecture' | 'compliance' | 'legal-framework' | 'digital-signatures' | 'gdpr' | 'healthcare' | 'case-studies' | 'data-lifecycle' | 'data-classification' | 'penalties' | 'consent' | 'encryption' | 'audit-log' | 'breach-detection';
+type TabId = 'home' | 'pipeline' | 'architecture' | 'compliance' | 'legal-framework' | 'digital-signatures' | 'gdpr' | 'healthcare' | 'case-studies' | 'data-lifecycle' | 'data-classification' | 'penalties' | 'consent' | 'encryption' | 'audit-log' | 'breach-detection' | 'compliance-score' | 'data-lineage' | 'risk-assessment' | 'access-control';
 
 interface HeaderProps {
   activeTab?: TabId;
@@ -56,6 +56,10 @@ export default function Header({ activeTab }: HeaderProps) {
     { id: 'encryption', label: 'Encryption Comparison', path: '/encryption' },
     { id: 'audit-log', label: 'Audit Log', path: '/audit-log' },
     { id: 'breach-detection', label: 'Breach Detection', path: '/breach-detection' },
+    { id: 'compliance-score', label: 'Compliance Score', path: '/compliance-score' },
+    { id: 'data-lineage', label: 'Data Lineage', path: '/data-lineage' },
+    { id: 'risk-assessment', label: 'Risk Assessment', path: '/risk-assessment' },
+    { id: 'access-control', label: 'Access Control', path: '/access-control' },
   ];
 
   const isLegalActive = legalPages.some(p => p.id === activeTab);
