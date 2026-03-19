@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   UploadCloud,
   Plus,
   Minus,
   ArrowRight,
   ShieldCheck,
-  FileCode
+  FileCode,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -13,8 +15,11 @@ import Header from './Header';
 
 export default function DatabaseSelection() {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedDataset, setSelectedDataset] = useState('mimic');
   const [sampleSize, setSampleSize] = useState(50);
+  const [uploading, setUploading] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<{ filename: string, path: string } | null>(null);
 
   const datasets = [
     {
@@ -47,6 +52,32 @@ export default function DatabaseSelection() {
       isGeneralized: true
     }
   ];
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUploadedFile(data);
+        setSelectedDataset('generalized');
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-bg-light text-neutral-dark font-sans selection:bg-primary-gold/30">
@@ -100,11 +131,25 @@ export default function DatabaseSelection() {
 
                 <div className="border-t border-primary-gold/10 pt-6 mt-auto">
                   {dataset.isGeneralized && selectedDataset === 'generalized' ? (
-                    <div className="p-4 bg-bg-light/50 border border-dashed border-primary-gold/20 rounded-sm flex flex-col items-center justify-center text-center">
-                      <UploadCloud className="text-primary-gold/60 mb-2" size={20} />
+                    <div 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        fileInputRef.current?.click();
+                      }}
+                      className="p-4 bg-bg-light/50 border border-dashed border-primary-gold/20 rounded-sm flex flex-col items-center justify-center text-center hover:bg-bg-light transition-colors"
+                    >
+                      {uploading ? (
+                        <Loader2 className="animate-spin text-primary-gold mb-2" size={20} />
+                      ) : uploadedFile ? (
+                        <CheckCircle2 className="text-green-500 mb-2" size={20} />
+                      ) : (
+                        <UploadCloud className="text-primary-gold/60 mb-2" size={20} />
+                      )}
                       <p className="font-mono text-[8px] uppercase tracking-widest text-neutral-dark/40">
-                        Upload Custom CSV or <br />
-                        <span className="text-primary-gold underline cursor-pointer">Select ILPD Registry</span>
+                        {uploading ? 'Uploading...' : uploadedFile ? `Ready: ${uploadedFile.filename}` : 'Upload Custom CSV or'} <br />
+                        <span className="text-primary-gold underline cursor-pointer">
+                          {uploadedFile ? 'Change File' : 'Select ILPD Registry'}
+                        </span>
                       </p>
                     </div>
                   ) : (
@@ -128,6 +173,14 @@ export default function DatabaseSelection() {
               </motion.div>
             ))}
           </div>
+
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileUpload} 
+            className="hidden" 
+            accept=".csv"
+          />
 
           {/* Controls */}
           <div className="mt-20 flex flex-col items-center gap-10 w-full">
@@ -155,10 +208,16 @@ export default function DatabaseSelection() {
               </div>
             </div>
             <button
-              onClick={() => navigate('/dashboard', { state: { dataset: selectedDataset === 'mimic' ? 'MIMIC-IV v3.2' : 'ILPD', sampleSize: sampleSize } })}
+              onClick={() => navigate('/dashboard', { 
+                state: { 
+                  dataset: selectedDataset === 'mimic' ? 'MIMIC-IV v3.2' : (uploadedFile ? uploadedFile.filename : 'ILPD'), 
+                  sampleSize: sampleSize,
+                  filePath: uploadedFile?.path
+                } 
+              })}
               className="bg-neutral-dark text-white font-sans text-xs tracking-[0.2em] uppercase px-16 py-6 rounded-sm hover:bg-neutral-dark/90 transition-all flex items-center gap-3 group"
             >
-              <span>Proceed to Dashboard</span>
+              <span>Run Pipeline</span>
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </button>
           </div>

@@ -219,12 +219,29 @@ def preprocess(data_dir: str = str(DEFAULT_DATA_DIR),
         Merged and cleaned subset ready for HL7 transformation.
     """
     data_path = Path(data_dir)
+    subset_path = data_path / "mimic_subset.csv.gz"
+
+    # Optimization: Use existing subset if available to save 2+ minutes of streaming
+    if subset_path.exists():
+        logger.info("[Phase 1] CACHE HIT — Loading pre-processed subset from %s", subset_path)
+        merged = pd.read_csv(subset_path, compression="gzip")
+        # Ensure only the requested sample size is returned
+        n_patients = merged["subject_id"].nunique()
+        if n_patients > sample_size:
+            all_ids = merged["subject_id"].unique()
+            sample_ids = set(pd.Series(all_ids).sample(n=sample_size, random_state=random_seed))
+            merged = merged[merged["subject_id"].isin(sample_ids)]
+        return merged
 
     patients, sample_ids = load_patients(data_path, sample_size,
                                          random_seed=random_seed)
     d_labitems = load_d_labitems(data_path)
     labevents = stream_labevents(data_path, sample_ids)
     merged = merge_datasets(patients, labevents, d_labitems)
+
+    # Save the subset for future use (Automatic Cache Creation)
+    logger.info("[Phase 1] Caching subset to %s for faster subsequent runs", subset_path)
+    merged.to_csv(subset_path, index=False, compression="gzip")
 
     # -----------------------------------------------------------------------
     # Summary statistics

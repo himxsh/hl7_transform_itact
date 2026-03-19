@@ -2,9 +2,39 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ShieldCheck, BookOpen, Scale, Shield, Heart, Globe } from 'lucide-react';
 import Header from './Header';
+import { useState, useEffect } from 'react';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    legal_sections: '20+',
+    offences: '14',
+    case_studies: '9',
+    course_units: '5',
+    records_processed: '0',
+    compliance_index: '--',
+    risk_threats: '--',
+    system_state: 'SECURE'
+  });
+
+  useEffect(() => {
+    fetch('/api/stats')
+      .then(res => res.json())
+      .then(data => {
+        setStats({
+          legal_sections: data.legal_sections.toString(),
+          offences: data.offences.toString(),
+          case_studies: data.case_studies.toString(),
+          course_units: '5',
+          records_processed: data.records_processed.toString(),
+          compliance_index: data.compliance_index.toString(),
+          risk_threats: data.risk_threats.toString(),
+          system_state: data.system_state
+        });
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <div className="bg-[#f7f7f6] text-[#1c1a16] font-sans selection:bg-gold/30">
       <Header activeTab="home" />
@@ -116,11 +146,11 @@ export default function LandingPage() {
         <section className="max-w-[1440px] mx-auto px-6 lg:px-12 py-16 border-b border-gold/10">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
             {[
-              { stat: '20+', label: 'Legal Sections Mapped', sub: 'IT Act + DPDP + GDPR' },
-              { stat: '14', label: 'Offences Catalogued', sub: 'IT Act §43–§72A' },
-              { stat: '9', label: 'Case Studies', sub: 'Landmark Judgments' },
-              { stat: '5', label: 'Course Units', sub: 'Full Syllabus Coverage' },
-              { stat: '3', label: 'Data Protection Laws', sub: 'DPDP · IT Act · GDPR' },
+              { stat: stats.legal_sections, label: 'Legal Sections Mapped', sub: `Score: ${stats.compliance_index}%` },
+              { stat: stats.offences, label: 'Offences Catalogued', sub: 'IT Act §43–§72A' },
+              { stat: stats.records_processed, label: 'Records Processed', sub: `State: ${stats.system_state}` },
+              { stat: stats.risk_threats, label: 'Risk Threats', sub: 'Quantified Index' },
+              { stat: stats.course_units, label: 'Course Units', sub: 'Full Syllabus Coverage' },
             ].map((item, idx) => (
               <motion.div
                 key={item.label}

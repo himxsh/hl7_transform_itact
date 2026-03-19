@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -34,6 +34,11 @@ app.add_middleware(
 
 DATA_DIR = "dataset"
 OUT_DIR = "output"
+UPLOAD_DIR = "uploads"
+
+# Ensure directories exist
+Path(OUT_DIR).mkdir(parents=True, exist_ok=True)
+Path(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
 
 # Shared instances
 audit_logger = AuditLogger()
@@ -50,6 +55,7 @@ _latest_encryption_results: list = []
 class RunConfig(BaseModel):
     dataset: str
     sampleSize: int
+    filePath: Optional[str] = None
 
 class Record(BaseModel):
     id: str
@@ -209,8 +215,112 @@ async def run_pipeline(config: RunConfig):
 
                 yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully'})}\n\n"
             
-            elif config.dataset.lower().startswith("liver"):
-                yield f"data: {json.dumps({'status': 'error', 'message': 'Liver pipeline not yet optimized for streaming'})}\n\n"
+            elif config.dataset.lower().startswith("liver") or \
+                 config.dataset.lower().startswith("generalized") or \
+                 config.dataset.lower() == "ilpd" or \
+                 config.filePath:
+                # Generic/Liver Pipeline Ingestion
+                csv_to_process = config.filePath if config.filePath else os.path.join(DATA_DIR, "indian_liver_patient.csv")
+                
+                if not os.path.exists(csv_to_process):
+                    yield f"data: {json.dumps({'status': 'error', 'message': f'File not found: {csv_to_process}'})}\n\n"
+                    return
+
+                # Load and sample
+                df = pd.read_csv(csv_to_process)
+                if config.sampleSize and len(df) > config.sampleSize:
+                    df = df.sample(n=config.sampleSize, random_state=42).reset_index(drop=True)
+                
+                total = len(df)
+                
+                audit_logger.log(
+                    event_type="PIPELINE_START",
+                    details={"dataset": "generic", "file": csv_to_process, "sample_size": total},
+                    legal_reference="DPDP §8 (Data collection for processing)",
+                    severity="INFO",
+                )
+
+                yield f"data: {json.dumps({'status': 'progress', 'stage': 0, 'message': 'Initializing Generic Pipeline'})}\n\n"
+                await asyncio.sleep(0.1)
+                
+                anonymizer = Anonymizer(locale="en_IN")
+                integrity = IntegrityManager()
+
+                # Detect columns
+                cols = df.columns.tolist()
+                gender_col = next((c for c in cols if "gender" in c.lower() or "sex" in c.lower()), None)
+                age_col = next((c for c in cols if "age" in c.lower()), None)
+                
+                # Numeric columns for OBX
+                numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+                if age_col and age_col in numeric_cols: numeric_cols.remove(age_col)
+                
+                all_encryption_results = []
+                
+                for index, row in df.iterrows():
+                    subject_id = 900000 + index
+                    
+                    # Build Message
+                    now = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+                    segments = [
+                        f"MSH|^~\\&|GENERIC_PIPELINE|CSV_SOURCE|||{now}||ORU^R01^ORU_R01|{index}|P|2.5.1"
+                    ]
+                    
+                    last, first = anonymizer.anonymize_name(subject_id)
+                    gender = "U"
+                    if gender_col:
+                        g = str(row[gender_col]).upper()
+                        if g.startswith("M"): gender = "M"
+                        elif g.startswith("F"): gender = "F"
+                    
+                    age = 0
+                    if age_col:
+                        try: age = int(row[age_col])
+                        except: pass
+                    
+                    birth_year = datetime.now().year - age
+                    segments.append(f"PID|1||{subject_id}^^^CSV^MR||{last}^{first}^^^||{birth_year}0101|{gender}")
+                    
+                    obx_id = 1
+                    for col in numeric_cols:
+                        val = row[col]
+                        segments.append(f"OBX|{obx_id}|NM|{col}^GENERIC||{val}||||||F")
+                        obx_id += 1
+                        
+                    hl7_msg = "\n".join(segments)
+                    
+                    # Security Layer: Comparison of Multi-Algorithm Signatures [IT Act Requirement]
+                    hashes = encryption_comparator.compare_algorithms(hl7_msg)
+                    all_encryption_results.append({
+                        "id": str(subject_id),
+                        "hashes": hashes
+                    })
+                    enc_dicts = {h["algo"]: h["hash"][:16]+"..." for h in hashes}
+                    
+                    signed_msg = integrity.sign_message(hl7_msg)
+                    
+                    filename = f"gen_{subject_id}.hl7"
+                    with open(os.path.join(OUT_DIR, filename), "w") as f:
+                        f.write(signed_msg)
+                        
+                    # Build record for frontend
+                    record = {
+                        "id": str(subject_id),
+                        "pseudonym": f"{first} {last}",
+                        "sex": gender,
+                        "cohort": "Generic CSV",
+                        "labEvents": len(numeric_cols),
+                        "output": filename,
+                        "seal": "Valid",
+                        "encryption": enc_dicts,
+                        "raw_data": row.to_dict() # Include actual CSV features for dynamic UI
+                    }
+                    
+                    yield f"data: {json.dumps({'status': 'completed', 'record': record})}\n\n"
+                    await asyncio.sleep(0.05)
+                
+                _latest_encryption_results = all_encryption_results
+                yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully'})}\n\n"
             else:
                 yield f"data: {json.dumps({'status': 'error', 'message': 'Unsupported dataset'})}\n\n"
         except Exception as e:
@@ -358,6 +468,53 @@ async def get_access_control():
 async def get_access_matrix():
     """Return the roles × resources access matrix."""
     return access_control.get_access_matrix()
+
+# ---------------------------------------------------------------
+# NEW: File Upload Endpoint
+# ---------------------------------------------------------------
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Upload a custom CSV for processing."""
+    file_path = Path(UPLOAD_DIR) / file.filename
+    with open(file_path, "wb") as buffer:
+        buffer.write(await file.read())
+    
+    audit_logger.log(
+        event_type="FILE_UPLOADED",
+        details={"filename": file.filename, "path": str(file_path)},
+        legal_reference="DPDP §8 (Data collection)",
+        severity="INFO",
+    )
+    
+    return {"filename": file.filename, "path": str(file_path)}
+
+# ---------------------------------------------------------------
+# NEW: Stats Endpoint for Landing Page
+# ---------------------------------------------------------------
+
+@app.get("/api/stats")
+async def get_stats():
+    """Return aggregated stats for the landing page."""
+    # Count processed HL7 files
+    processed_count = len(list(Path(OUT_DIR).glob("*.hl7")))
+    
+    # Get current risk/compliance indices
+    risk = risk_assessor.assess()
+    score = compliance_scorer.score(
+        has_anonymizer=True, has_integrity=True, has_encryption=True,
+        has_audit_log=True, has_breach_detector=True, output_dir=OUT_DIR
+    )
+    
+    return {
+        "legal_sections": 24, # Representing mapped sections
+        "offences": 14,
+        "case_studies": 9,
+        "records_processed": processed_count,
+        "compliance_index": score["overall_score"],
+        "risk_threats": risk["summary"]["total"],
+        "system_state": "SECURE" if score["overall_score"] > 80 else "WARNING"
+    }
 
 @app.get("/api/access-control/check")
 async def check_access(role: str, resource: str, action: str = "read"):
