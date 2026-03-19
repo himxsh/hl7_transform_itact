@@ -146,4 +146,6 @@ data/
 # Project-specific: generated PDFs and session notes
 *.pdf
 chat.md
+# Project-specific: user uploaded files
+/uploads/
 plan.md

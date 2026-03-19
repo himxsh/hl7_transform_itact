@@ -32,7 +32,7 @@ export default function LandingPage() {
           system_state: data.system_state
         });
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   return (
@@ -247,7 +247,7 @@ export default function LandingPage() {
               viewport={{ once: true }}
               className="font-title text-4xl font-light mb-4"
             >
-              Course <span className="italic font-title text-gold">Coverage</span>
+              <span className="italic font-title text-gold">Coverage</span>
             </motion.h2>
             <div className="w-24 h-px bg-gold"></div>
             <p className="font-sans text-slate-500 mt-6 max-w-xl leading-relaxed">
@@ -282,63 +282,6 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Compliance Detailed */}
-        <section id="compliance" className="max-w-[1440px] mx-auto px-6 lg:px-12 py-24">
-          <div className="grid lg:grid-cols-2 gap-24 items-center">
-            <div className="relative">
-              <div className="absolute -top-12 -left-12 font-title text-[200px] leading-none text-gold/5 select-none pointer-events-none">§</div>
-              <div className="relative z-10 space-y-16">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                >
-                  <h3 className="font-title text-3xl font-light mb-4 tracking-tight">DPDP Act 2023 Compliance</h3>
-                  <p className="font-sans text-slate-500 leading-relaxed max-w-md">Strict adherence to Digital Personal Data Protection mandates, featuring automated 'right to erasure' and purpose limitation protocols.</p>
-                  <span className="font-mono text-[10px] text-gold/60 mt-4 block uppercase tracking-wider">§8: Duties of Data Fiduciary</span>
-                  <button
-                    onClick={() => navigate('/compliance')}
-                    className="mt-8 px-6 py-3 border border-gold/30 text-gold font-mono text-[10px] uppercase tracking-widest hover:bg-gold hover:text-charcoal transition-all"
-                  >
-                    Read More
-                  </button>
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.1 }}
-                >
-                  <h3 className="font-title text-3xl font-light mb-4 tracking-tight">IT Act 2000 Validation</h3>
-                  <p className="font-sans text-slate-500 leading-relaxed max-w-md">Governance framework for electronic records and digital signatures, ensuring legal validity for processed clinical reports.</p>
-                  <span className="font-mono text-[10px] text-gold/60 mt-4 block uppercase tracking-wider">§43: Penalty for Damage to Computer System</span>
-                  <button
-                    onClick={() => navigate('/compliance')}
-                    className="mt-8 px-6 py-3 border border-gold/30 text-gold font-mono text-[10px] uppercase tracking-widest hover:bg-gold hover:text-charcoal transition-all"
-                  >
-                    Read More
-                  </button>
-                </motion.div>
-              </div>
-            </div>
-            <div className="bg-charcoal p-1">
-              <div className="aspect-square bg-white/5 flex flex-col items-center justify-center border border-white/10 relative overflow-hidden">
-                <div className="absolute inset-0 opacity-20 pointer-events-none">
-                  <img
-                    alt="Cybersecurity grid"
-                    className="w-full h-full object-cover grayscale"
-                    src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=1000"
-                    referrerPolicy="no-referrer"
-                  />
-                </div>
-                <div className="relative z-10 text-center">
-                  <ShieldCheck size={64} strokeWidth={1} className="text-gold mb-6 mx-auto" />
-                  <div className="font-mono text-xs tracking-[0.5em] text-white">SYSTEM_STATE: SECURE</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
       </main>
 
       {/* Footer */}

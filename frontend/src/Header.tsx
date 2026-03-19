@@ -78,9 +78,8 @@ export default function Header({ activeTab }: HeaderProps) {
             <Link
               key={item.id}
               to={item.path}
-              className={`relative py-1 transition-colors hover:text-gold ${
-                activeTab === item.id ? 'text-gold' : ''
-              }`}
+              className={`relative py-1 transition-colors hover:text-gold ${activeTab === item.id ? 'text-gold' : ''
+                }`}
             >
               {item.label}
               {activeTab === item.id && (
@@ -97,9 +96,8 @@ export default function Header({ activeTab }: HeaderProps) {
           <div className="relative" ref={legalRef}>
             <button
               onClick={() => { setLegalOpen(!legalOpen); setSecurityOpen(false); }}
-              className={`relative py-1 transition-colors hover:text-gold flex items-center gap-1 ${
-                isLegalActive ? 'text-gold' : ''
-              }`}
+              className={`relative py-1 transition-colors hover:text-gold flex items-center gap-1 ${isLegalActive ? 'text-gold' : ''
+                }`}
             >
               Legal
               <ChevronDown size={12} className={`transition-transform ${legalOpen ? 'rotate-180' : ''}`} />
@@ -126,9 +124,8 @@ export default function Header({ activeTab }: HeaderProps) {
                       key={page.id}
                       to={page.path}
                       onClick={() => setLegalOpen(false)}
-                      className={`block px-5 py-2.5 text-[10px] uppercase tracking-[0.15em] transition-all hover:bg-gold/5 hover:text-gold ${
-                        activeTab === page.id ? 'text-gold bg-gold/5' : 'text-slate-600'
-                      }`}
+                      className={`block px-5 py-2.5 text-[10px] uppercase tracking-[0.15em] transition-all hover:bg-gold/5 hover:text-gold ${activeTab === page.id ? 'text-gold bg-gold/5' : 'text-slate-600'
+                        }`}
                     >
                       {page.label}
                     </Link>
@@ -142,9 +139,8 @@ export default function Header({ activeTab }: HeaderProps) {
           <div className="relative" ref={securityRef}>
             <button
               onClick={() => { setSecurityOpen(!securityOpen); setLegalOpen(false); }}
-              className={`relative py-1 transition-colors hover:text-gold flex items-center gap-1 ${
-                isSecurityActive ? 'text-gold' : ''
-              }`}
+              className={`relative py-1 transition-colors hover:text-gold flex items-center gap-1 ${isSecurityActive ? 'text-gold' : ''
+                }`}
             >
               Security
               <ChevronDown size={12} className={`transition-transform ${securityOpen ? 'rotate-180' : ''}`} />
@@ -171,9 +167,8 @@ export default function Header({ activeTab }: HeaderProps) {
                       key={page.id}
                       to={page.path}
                       onClick={() => setSecurityOpen(false)}
-                      className={`block px-5 py-2.5 text-[10px] uppercase tracking-[0.15em] transition-all hover:bg-gold/5 hover:text-gold ${
-                        activeTab === page.id ? 'text-gold bg-gold/5' : 'text-slate-600'
-                      }`}
+                      className={`block px-5 py-2.5 text-[10px] uppercase tracking-[0.15em] transition-all hover:bg-gold/5 hover:text-gold ${activeTab === page.id ? 'text-gold bg-gold/5' : 'text-slate-600'
+                        }`}
                     >
                       {page.label}
                     </Link>
