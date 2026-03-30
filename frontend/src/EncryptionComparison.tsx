@@ -201,7 +201,7 @@ export const EncryptionComparisonContent = ({ isModal = false }: { isModal?: boo
               <div className="col-span-3 font-mono text-[8px] uppercase tracking-widest text-primary-gold font-bold text-center">HMAC-SHA512</div>
               <div className="col-span-2 font-mono text-[8px] uppercase tracking-widest text-primary-gold font-bold text-center">SHA3-256</div>
             </div>
-            {data.slice(0, isModal ? 10 : 20).map((record, idx) => (
+            {data.map((record, idx) => (
               <div key={record.subject_id} className={`grid grid-cols-12 gap-0 px-4 py-2 border-b border-primary-gold/5 ${idx % 2 === 0 ? '' : 'bg-primary-gold/[0.01]'}`}>
                 <div className="col-span-2 font-mono text-[10px] text-primary-gold font-bold">{record.subject_id}</div>
                 {record.results.map((r) => (
