@@ -47,7 +47,7 @@ const transformColors: Record<string, string> = {
   mac: 'bg-orange-100 text-orange-600',
 };
 
-export default function DataLineage() {
+export const DataLineageContent = ({ isModal = false }: { isModal?: boolean }) => {
   const [data, setData] = useState<LineageData | null>(null);
   const [selectedField, setSelectedField] = useState<string | null>(null);
   const [fieldLineage, setFieldLineage] = useState<{ upstream: LineageEdge[], downstream: LineageEdge[] } | null>(null);
@@ -72,37 +72,44 @@ export default function DataLineage() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-light text-neutral-dark font-sans selection:bg-primary-gold/30">
-      <Header activeTab="home" />
-      <main className="max-w-[1200px] mx-auto px-6 py-24">
+    <div className="space-y-10">
+      {!isModal && (
         <div className="flex flex-col mb-16 text-center items-center">
           <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="font-title text-5xl lg:text-7xl leading-[0.9] tracking-tighter mb-8">
             Data <span className="italic font-title text-primary-gold">Lineage</span>
           </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="font-sans text-neutral-dark/60 max-w-xl leading-relaxed">
+          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="font-sans text-neutral-dark/60 max-w-xl leading-relaxed text-sm">
             Complete provenance graph tracking every data field from CSV source through anonymisation to HL7 output — as required by GDPR Art.&nbsp;30 and DPDP §8.
           </motion.p>
         </div>
+      )}
 
-        {data && (
-          <>
-            {/* Stats Strip */}
-            <div className="grid grid-cols-3 gap-6 mb-16">
-              <div className="bg-white border border-primary-gold/10 p-6 text-center">
-                <div className="font-title text-4xl text-primary-gold">{data.total_nodes}</div>
-                <div className="font-mono text-[9px] uppercase tracking-widest text-neutral-dark/40">Data Fields</div>
-              </div>
-              <div className="bg-white border border-primary-gold/10 p-6 text-center">
-                <div className="font-title text-4xl text-primary-gold">{data.total_edges}</div>
-                <div className="font-mono text-[9px] uppercase tracking-widest text-neutral-dark/40">Transformations</div>
-              </div>
-              <div className="bg-white border border-primary-gold/10 p-6 text-center">
-                <div className="font-title text-4xl text-primary-gold">{stageOrder.length}</div>
-                <div className="font-mono text-[9px] uppercase tracking-widest text-neutral-dark/40">Pipeline Stages</div>
-              </div>
+      {isModal && (
+        <div className="flex flex-col items-center text-center">
+          <h2 className="font-title text-3xl mb-4">Data <span className="italic text-primary-gold">Lineage</span></h2>
+          <p className="text-neutral-dark/60 text-xs max-w-xl mb-6">Provenance map tracking fields from CSV to HL7 segments.</p>
+        </div>
+      )}
+
+      {data && (
+        <>
+          {/* Stats Strip */}
+          <div className="grid grid-cols-3 gap-6 mb-16">
+            <div className="bg-white border border-primary-gold/10 p-6 text-center">
+              <div className="font-title text-3xl text-primary-gold">{data.total_nodes}</div>
+              <div className="font-mono text-[9px] uppercase tracking-widest text-neutral-dark/40">Data Fields</div>
             </div>
+            <div className="bg-white border border-primary-gold/10 p-6 text-center">
+              <div className="font-title text-3xl text-primary-gold">{data.total_edges}</div>
+              <div className="font-mono text-[9px] uppercase tracking-widest text-neutral-dark/40">Transformations</div>
+            </div>
+            <div className="bg-white border border-primary-gold/10 p-6 text-center">
+              <div className="font-title text-3xl text-primary-gold">{stageOrder.length}</div>
+              <div className="font-mono text-[9px] uppercase tracking-widest text-neutral-dark/40">Pipeline Stages</div>
+            </div>
+          </div>
 
-            {/* Transformation Summary */}
+          {!isModal && (
             <motion.section initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-16">
               <h2 className="font-title text-2xl mb-6">Transformation Types</h2>
               <div className="flex flex-wrap gap-4">
@@ -113,53 +120,55 @@ export default function DataLineage() {
                 ))}
               </div>
             </motion.section>
+          )}
 
-            {/* Stage-by-Stage Graph */}
-            <div className="space-y-8 mb-16">
-              {stageOrder.filter(s => data.stages[s]).map((stage, stageIdx) => (
-                <motion.section key={stage} initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: stageIdx * 0.08 }}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <GitBranch size={16} className="text-primary-gold" />
-                    <h3 className="font-title text-xl">{stageLabels[stage]}</h3>
-                    <span className="font-mono text-[9px] text-neutral-dark/30">{data.stages[stage].length} fields</span>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    {data.stages[stage].map(node => (
-                      <button
-                        key={node.field}
-                        onClick={() => selectField(node.field)}
-                        className={`px-4 py-3 border text-left transition-all hover:shadow-md ${selectedField === node.field ? 'ring-2 ring-primary-gold shadow-lg' : ''} ${stageColors[stage]}`}
-                      >
-                        <div className="font-mono text-[11px] font-bold">{node.field}</div>
-                        <div className="font-sans text-[10px] opacity-60 mt-0.5">{node.description}</div>
-                      </button>
-                    ))}
-                  </div>
-                  {stageIdx < stageOrder.filter(s => data.stages[s]).length - 1 && (
-                    <div className="flex justify-center my-4"><ArrowRight size={20} className="text-primary-gold/30 rotate-90" /></div>
-                  )}
-                </motion.section>
-              ))}
-            </div>
-
-            {/* Field Details */}
-            {fieldLineage && selectedField && (
-              <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white border border-primary-gold/10 p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <Search size={16} className="text-primary-gold" />
-                  <h3 className="font-title text-2xl">Lineage: <span className="text-primary-gold">{selectedField}</span></h3>
+          {/* Stage-by-Stage Graph */}
+          <div className="space-y-8 mb-16">
+            {stageOrder.filter(s => data.stages[s]).map((stage, stageIdx) => (
+              <motion.section key={stage} initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ delay: stageIdx * 0.05 }}>
+                <div className="flex items-center gap-3 mb-4">
+                  <GitBranch size={16} className="text-primary-gold" />
+                  <h3 className="font-title text-lg uppercase tracking-wider">{stageLabels[stage]}</h3>
+                  <span className="font-mono text-[9px] text-neutral-dark/30">{data.stages[stage].length} fields</span>
                 </div>
+                <div className="flex flex-wrap gap-3">
+                  {data.stages[stage].map(node => (
+                    <button
+                      key={node.field}
+                      onClick={() => selectField(node.field)}
+                      className={`px-4 py-3 border text-left transition-all hover:shadow-md ${selectedField === node.field ? 'ring-2 ring-primary-gold shadow-lg' : ''} ${stageColors[stage]}`}
+                    >
+                      <div className="font-mono text-[10px] font-bold">{node.field}</div>
+                      <div className="font-sans text-[9px] opacity-60 mt-0.5">{node.description}</div>
+                    </button>
+                  ))}
+                </div>
+                {stageIdx < stageOrder.filter(s => data.stages[s]).length - 1 && (
+                  <div className="flex justify-center my-4"><ArrowRight size={20} className="text-primary-gold/30 rotate-90" /></div>
+                )}
+              </motion.section>
+            ))}
+          </div>
+
+          {/* Field Details */}
+          {fieldLineage && selectedField && (
+            <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white border border-primary-gold/10 p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <Search size={16} className="text-primary-gold" />
+                <h3 className="font-title text-2xl">Lineage: <span className="text-primary-gold">{selectedField}</span></h3>
+              </div>
+              <div className="space-y-6">
                 {fieldLineage.upstream.length > 0 && (
-                  <div className="mb-6">
+                  <div>
                     <h4 className="font-mono text-[9px] uppercase tracking-widest text-neutral-dark/40 mb-3">Upstream (Sources)</h4>
                     <div className="space-y-2">
-                      {fieldLineage.upstream.map((e: LineageEdge, i: number) => (
-                        <div key={i} className="flex items-center gap-3 p-3 bg-primary-gold/[0.02] border border-primary-gold/5">
-                          <span className="font-mono text-[11px] font-bold text-primary-gold">{e.source_field}</span>
+                       {fieldLineage.upstream.map((e: LineageEdge, i: number) => (
+                        <div key={i} className="flex items-center gap-3 p-3 bg-primary-gold/[0.02] border border-primary-gold/5 flex-wrap">
+                          <span className="font-mono text-[10px] font-bold text-primary-gold">{e.source_field}</span>
                           <span className={`font-mono text-[8px] uppercase tracking-widest px-2 py-0.5 rounded-sm ${transformColors[e.transformation] || ''}`}>{e.transformation}</span>
                           <ArrowRight size={12} className="text-neutral-dark/20" />
-                          <span className="font-mono text-[11px]">{e.target_field}</span>
-                          <span className="font-mono text-[9px] text-neutral-dark/30 ml-auto">{e.legal_reference}</span>
+                          <span className="font-mono text-[10px]">{e.target_field}</span>
+                          <span className="font-mono text-[8px] text-neutral-dark/30 ml-auto">{e.legal_reference}</span>
                         </div>
                       ))}
                     </div>
@@ -170,24 +179,32 @@ export default function DataLineage() {
                     <h4 className="font-mono text-[9px] uppercase tracking-widest text-neutral-dark/40 mb-3">Downstream (Targets)</h4>
                     <div className="space-y-2">
                       {fieldLineage.downstream.map((e: LineageEdge, i: number) => (
-                        <div key={i} className="flex items-center gap-3 p-3 bg-primary-gold/[0.02] border border-primary-gold/5">
-                          <span className="font-mono text-[11px]">{e.source_field}</span>
+                        <div key={i} className="flex items-center gap-3 p-3 bg-primary-gold/[0.02] border border-primary-gold/5 flex-wrap">
+                          <span className="font-mono text-[10px]">{e.source_field}</span>
                           <span className={`font-mono text-[8px] uppercase tracking-widest px-2 py-0.5 rounded-sm ${transformColors[e.transformation] || ''}`}>{e.transformation}</span>
                           <ArrowRight size={12} className="text-neutral-dark/20" />
-                          <span className="font-mono text-[11px] font-bold text-primary-gold">{e.target_field}</span>
-                          <span className="font-mono text-[9px] text-neutral-dark/30 ml-auto">{e.legal_reference}</span>
+                          <span className="font-mono text-[10px] font-bold text-primary-gold">{e.target_field}</span>
+                          <span className="font-mono text-[8px] text-neutral-dark/30 ml-auto">{e.legal_reference}</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-                {fieldLineage.upstream.length === 0 && fieldLineage.downstream.length === 0 && (
-                  <p className="font-sans text-neutral-dark/40 text-center py-6">No lineage edges found for this field.</p>
-                )}
-              </motion.section>
-            )}
-          </>
-        )}
+              </div>
+            </motion.section>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+export default function DataLineage() {
+  return (
+    <div className="min-h-screen bg-bg-light text-neutral-dark font-sans selection:bg-primary-gold/30">
+      <Header activeTab="data-lineage" />
+      <main className="max-w-[1200px] mx-auto px-6 py-24">
+        <DataLineageContent />
       </main>
     </div>
   );

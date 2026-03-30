@@ -1,5 +1,12 @@
 #!/bin/bash
-                                                   
+
+echo "Starting Backend (Uvicorn) using venv..."
+./venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 &
+BACKEND_PID=$!
+
+# Wait a bit for backend to initialize
+sleep 2
+
 echo "Starting Frontend (Vite)..."
 cd frontend && npm run dev &
 FRONTEND_PID=$!

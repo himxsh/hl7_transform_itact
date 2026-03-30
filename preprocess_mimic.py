@@ -227,17 +227,31 @@ def preprocess(data_dir: str = str(DEFAULT_DATA_DIR),
         merged = pd.read_csv(subset_path, compression="gzip")
         # Ensure only the requested sample size is returned
         n_patients = merged["subject_id"].nunique()
-        if n_patients > sample_size:
+        if n_patients >= sample_size:
             all_ids = merged["subject_id"].unique()
+            # Randomly pick sample_size patients from the cache
             sample_ids = set(pd.Series(all_ids).sample(n=sample_size, random_state=random_seed))
             merged = merged[merged["subject_id"].isin(sample_ids)]
-        return merged
+            return merged
+        else:
+            logger.info("[Phase 1] Cache insufficient (%d patients < %d requested). Re-processing.", n_patients, sample_size)
 
-    patients, sample_ids = load_patients(data_path, sample_size,
-                                         random_seed=random_seed)
+    # Oversample patients to ensure we have enough with lab events
+    # Many patients in patients.csv.gz may not have entries in labevents.csv.gz
+    oversample_n = max(sample_size * 3, 200) 
+    patients_pool, pool_ids = load_patients(data_path, oversample_n, random_seed=random_seed)
     d_labitems = load_d_labitems(data_path)
-    labevents = stream_labevents(data_path, sample_ids)
-    merged = merge_datasets(patients, labevents, d_labitems)
+    labevents = stream_labevents(data_path, pool_ids)
+    merged = merge_datasets(patients_pool, labevents, d_labitems)
+
+    # Now downsample to exactly sample_size after we know who has labs
+    actual_ids = merged["subject_id"].unique()
+    if len(actual_ids) > sample_size:
+        logger.info("[Phase 1] Final reduction: %d patients found with labs, selecting exactly %d", len(actual_ids), sample_size)
+        final_sample_ids = set(pd.Series(actual_ids).sample(n=sample_size, random_state=random_seed))
+        merged = merged[merged["subject_id"].isin(final_sample_ids)]
+    elif len(actual_ids) < sample_size:
+        logger.warning("[Phase 1] Requested %d, but only %d patients with lab events were found in the dataset.", sample_size, len(actual_ids))
 
     # Save the subset for future use (Automatic Cache Creation)
     logger.info("[Phase 1] Caching subset to %s for faster subsequent runs", subset_path)

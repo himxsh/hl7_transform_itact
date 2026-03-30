@@ -20,6 +20,7 @@ from preprocess_mimic import preprocess
 import pandas as pd
 import json
 from dataclasses import asdict
+from datetime import datetime, timezone
 
 app = FastAPI()
 
@@ -228,10 +229,11 @@ async def run_pipeline(config: RunConfig):
 
                 # Load and sample
                 df = pd.read_csv(csv_to_process)
-                if config.sampleSize and len(df) > config.sampleSize:
-                    df = df.sample(n=config.sampleSize, random_state=42).reset_index(drop=True)
+                n_to_sample = min(len(df), config.sampleSize) if config.sampleSize else len(df)
+                df = df.sample(n=n_to_sample, random_state=42).reset_index(drop=True)
                 
                 total = len(df)
+                print(f"[DEBUG] Final dataframe length (randomized): {total}")
                 
                 audit_logger.log(
                     event_type="PIPELINE_START",
@@ -290,17 +292,18 @@ async def run_pipeline(config: RunConfig):
                     hl7_msg = "\n".join(segments)
                     
                     # Security Layer: Comparison of Multi-Algorithm Signatures [IT Act Requirement]
-                    hashes = encryption_comparator.compare_algorithms(hl7_msg)
+                    enc_results = encryption_comparator.compare(hl7_msg)
+                    enc_dicts = [asdict(r) for r in enc_results]
                     all_encryption_results.append({
-                        "id": str(subject_id),
-                        "hashes": hashes
+                        "subject_id": str(subject_id),
+                        "results": enc_dicts,
                     })
-                    enc_dicts = {h["algo"]: h["hash"][:16]+"..." for h in hashes}
                     
                     signed_msg = integrity.sign_message(hl7_msg)
                     
                     filename = f"gen_{subject_id}.hl7"
-                    with open(os.path.join(OUT_DIR, filename), "w") as f:
+                    out_file = Path(OUT_DIR) / filename
+                    with open(out_file, "w", encoding="utf-8") as f:
                         f.write(signed_msg)
                         
                     # Build record for frontend
@@ -317,7 +320,7 @@ async def run_pipeline(config: RunConfig):
                     }
                     
                     yield f"data: {json.dumps({'status': 'completed', 'record': record})}\n\n"
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(0.2) # Further increased delay
                 
                 _latest_encryption_results = all_encryption_results
                 yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully'})}\n\n"

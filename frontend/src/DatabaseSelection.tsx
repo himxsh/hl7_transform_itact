@@ -146,9 +146,9 @@ export default function DatabaseSelection() {
                         <UploadCloud className="text-primary-gold/60 mb-2" size={20} />
                       )}
                       <p className="font-mono text-[8px] uppercase tracking-widest text-neutral-dark/40">
-                        {uploading ? 'Uploading...' : uploadedFile ? `Ready: ${uploadedFile.filename}` : 'Upload Custom CSV or'} <br />
+                        {uploading ? 'Uploading...' : uploadedFile ? `Ready: ${uploadedFile.filename}` : 'Upload CSV for Processing'} <br />
                         <span className="text-primary-gold underline cursor-pointer">
-                          {uploadedFile ? 'Change File' : 'Select ILPD Registry'}
+                          {uploadedFile ? 'Change File' : 'Browse to begin'}
                         </span>
                       </p>
                     </div>
@@ -208,14 +208,23 @@ export default function DatabaseSelection() {
               </div>
             </div>
             <button
-              onClick={() => navigate('/dashboard', { 
-                state: { 
-                  dataset: selectedDataset === 'mimic' ? 'MIMIC-IV v3.2' : (uploadedFile ? uploadedFile.filename : 'ILPD'), 
-                  sampleSize: sampleSize,
-                  filePath: uploadedFile?.path
-                } 
-              })}
-              className="bg-neutral-dark text-white font-sans text-xs tracking-[0.2em] uppercase px-16 py-6 rounded-sm hover:bg-neutral-dark/90 transition-all flex items-center gap-3 group"
+              onClick={() => {
+                if (selectedDataset === 'generalized' && !uploadedFile) {
+                  alert("Please upload a CSV file to use Generalized Mode.");
+                  return;
+                }
+                navigate('/dashboard', { 
+                  state: { 
+                    dataset: selectedDataset === 'mimic' ? 'MIMIC-IV v3.2' : (uploadedFile ? uploadedFile.filename : 'ILPD'), 
+                    sampleSize: sampleSize,
+                    filePath: uploadedFile?.path
+                  } 
+                });
+              }}
+              disabled={selectedDataset === 'generalized' && !uploadedFile}
+              className={`bg-neutral-dark text-white font-sans text-xs tracking-[0.2em] uppercase px-16 py-6 rounded-sm transition-all flex items-center gap-3 group ${
+                selectedDataset === 'generalized' && !uploadedFile ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-dark/90 cursor-pointer'
+              }`}
             >
               <span>Run Pipeline</span>
               <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />

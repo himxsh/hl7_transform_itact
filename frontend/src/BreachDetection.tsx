@@ -29,7 +29,7 @@ const severityConfig: Record<string, { color: string; icon: React.ReactNode }> =
   LOW: { color: 'bg-blue-100 text-blue-700 border-blue-200', icon: <Info size={16} className="text-blue-600" /> },
 };
 
-export default function BreachDetection() {
+export const BreachDetectionContent = ({ isModal = false }: { isModal?: boolean }) => {
   const [result, setResult] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,173 +63,124 @@ export default function BreachDetection() {
   };
 
   return (
-    <div className="min-h-screen bg-bg-light text-neutral-dark font-sans selection:bg-primary-gold/30">
-      <Header activeTab="home" />
-
-      <main className="max-w-[1200px] mx-auto px-6 py-24">
-        {/* Hero */}
+    <div className="space-y-12">
+      {!isModal && (
         <div className="flex flex-col mb-20 text-center items-center">
-          <motion.h1
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="font-title text-5xl lg:text-7xl leading-[0.9] tracking-tighter mb-8 max-w-3xl"
-          >
+          <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="font-title text-5xl lg:text-7xl leading-[0.9] tracking-tighter mb-8">
             Breach <span className="italic font-title text-primary-gold">Detection</span>
           </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="font-sans text-neutral-dark/60 max-w-xl leading-relaxed"
-          >
+          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="font-sans text-neutral-dark/60 max-w-xl leading-relaxed text-sm">
             Automated scanning for residual PII leaks, integrity violations, and anomalies in processed HL7 output — as mandated by DPDP Act §15.
           </motion.p>
-
-          <motion.button
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            onClick={runScan}
-            disabled={loading}
-            className="mt-8 flex items-center gap-3 px-10 py-4 bg-primary-gold text-[#1c1a16] font-mono text-xs uppercase tracking-widest hover:bg-primary-gold/90 transition-all border border-primary-gold disabled:opacity-50"
-          >
-            <Search size={14} className={loading ? 'animate-pulse' : ''} />
-            {loading ? 'Scanning...' : 'Run Breach Scan'}
+          <motion.button onClick={runScan} disabled={loading} className="mt-8 flex items-center gap-3 px-10 py-4 bg-primary-gold text-[#1c1a16] font-mono text-xs uppercase tracking-widest hover:bg-primary-gold/90 transition-all border border-primary-gold disabled:opacity-50">
+            <Search size={14} className={loading ? 'animate-pulse' : ''} /> {loading ? 'Scanning...' : 'Run Breach Scan'}
           </motion.button>
-
-          {error && (
-            <p className="mt-4 font-sans text-[12px] text-red-500">{error}</p>
-          )}
+          {error && <p className="mt-4 font-sans text-[12px] text-red-500">{error}</p>}
         </div>
+      )}
 
-        {/* Scan Types Reference */}
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mb-24"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { title: 'Residual PII Scan', desc: 'Regex-based detection of Aadhaar, PAN, email, phone, SSN patterns in NTE segments that may have survived anonymisation.', legal: 'IT Act §72A, DPDP §15', icon: '🔍' },
-              { title: 'Integrity Verification', desc: 'Re-computes SHA-256 hash of every HL7 message body and compares against the stored ZSH segment to detect tampering.', legal: 'IT Act §14, IT Act §43A', icon: '🛡️' },
-              { title: 'Anomaly Detection', desc: 'Statistical analysis of file sizes, duplicate content detection, and empty file identification across the output directory.', legal: 'IT Act §43, DPDP §8(4)', icon: '📊' },
-            ].map((scan, idx) => (
-              <div key={scan.title} className="bg-white border border-primary-gold/10 p-8 hover:border-primary-gold/30 transition-all">
-                <span className="text-2xl block mb-4">{scan.icon}</span>
-                <h3 className="font-title text-xl mb-2">{scan.title}</h3>
-                <p className="font-sans text-[12px] text-neutral-dark/50 leading-relaxed mb-3">{scan.desc}</p>
-                <span className="font-mono text-[9px] text-primary-gold/60">{scan.legal}</span>
-              </div>
-            ))}
-          </div>
-        </motion.section>
+      {isModal && (
+        <div className="flex flex-col items-center text-center">
+          <h2 className="font-title text-3xl mb-4">Breach <span className="italic text-primary-gold">Detection</span></h2>
+          <p className="text-neutral-dark/60 text-xs max-w-xl mb-6">Automated scanning for PII leaks and integrity violations (DPDP §15).</p>
+          <button onClick={runScan} disabled={loading} className="px-8 py-3 bg-primary-gold text-[#1c1a16] font-mono text-[10px] uppercase tracking-widest hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
+            <Search size={12} className={loading ? 'animate-pulse' : ''} /> {loading ? 'Scanning Output Registry...' : 'Run Real-time Breach Scan'}
+          </button>
+        </div>
+      )}
 
-        {/* Results */}
-        {result && (
-          <>
-            {/* Risk Score */}
-            <motion.section
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-16"
-            >
-              <div className="bg-white border border-primary-gold/10 p-10">
-                <div className="flex items-center justify-between mb-8">
-                  <div>
-                    <h2 className="font-title text-3xl mb-2">Risk Assessment</h2>
-                    <p className="font-mono text-[10px] text-neutral-dark/40">{result.files_scanned} files scanned · {result.summary.total} findings</p>
-                  </div>
-                  <div className="text-right">
-                    <div className={`font-title text-6xl ${riskColor(result.risk_score)}`}>{result.risk_score}</div>
-                    <div className="font-mono text-[9px] uppercase tracking-widest text-neutral-dark/40">Risk Score /100</div>
-                  </div>
+      {/* Scan Types Reference */}
+      <motion.section initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-12">
+        <div className={`grid grid-cols-1 ${isModal ? 'md:grid-cols-3' : 'md:grid-cols-3'} gap-4`}>
+          {[
+            { title: 'PII Scan', desc: 'Regex-based detection of Aadhaar, PAN, SSN in NTE segments.', legal: 'IT Act §72A', icon: '🔍' },
+            { title: 'Integrity', desc: 'SHA-256 hash validation vs ZSH segments.', legal: 'IT Act §14', icon: '🛡️' },
+            { title: 'Anomaly', desc: 'Statistical analysis of sizes and duplicates.', legal: 'DPDP §8(4)', icon: '📊' },
+          ].map((scan, idx) => (
+            <div key={scan.title} className="bg-white border border-primary-gold/10 p-6">
+              <span className="text-xl block mb-2">{scan.icon}</span>
+              <h3 className="font-title text-lg mb-1">{scan.title}</h3>
+              <p className="font-sans text-[11px] text-neutral-dark/50 leading-relaxed mb-2">{scan.desc}</p>
+              <span className="font-mono text-[8px] text-primary-gold/60 uppercase">{scan.legal}</span>
+            </div>
+          ))}
+        </div>
+      </motion.section>
+
+      {/* Results */}
+      {result && (
+        <>
+          <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-12">
+            <div className="bg-white border border-primary-gold/10 p-8">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="font-title text-2xl mb-1">Risk Assessment</h2>
+                  <p className="font-mono text-[9px] text-neutral-dark/40">{result.files_scanned} files scanned · {result.summary.total} findings</p>
                 </div>
-
-                {/* Risk Bar */}
-                <div className="w-full bg-neutral-dark/5 h-4 rounded-full overflow-hidden mb-8">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${result.risk_score}%` }}
-                    transition={{ duration: 1, ease: 'easeOut' }}
-                    className={`h-full rounded-full ${riskBarColor(result.risk_score)}`}
-                  />
-                </div>
-
-                {/* Severity Breakdown */}
-                <div className="grid grid-cols-4 gap-4">
-                  {(
-                    [
-                      { label: 'Critical', count: result.summary.critical, color: 'text-red-600 bg-red-50 border-red-200' },
-                      { label: 'High', count: result.summary.high, color: 'text-orange-600 bg-orange-50 border-orange-200' },
-                      { label: 'Medium', count: result.summary.medium, color: 'text-amber-600 bg-amber-50 border-amber-200' },
-                      { label: 'Low', count: result.summary.low, color: 'text-blue-600 bg-blue-50 border-blue-200' },
-                    ] as const
-                  ).map(s => (
-                    <div key={s.label} className={`border p-6 text-center ${s.color}`}>
-                      <div className="font-title text-3xl">{s.count}</div>
-                      <div className="font-mono text-[9px] uppercase tracking-widest">{s.label}</div>
-                    </div>
-                  ))}
+                <div className="text-right">
+                  <div className={`font-title text-5xl ${riskColor(result.risk_score)}`}>{result.risk_score}</div>
+                  <div className="font-mono text-[8px] uppercase tracking-widest text-neutral-dark/40">Risk Score</div>
                 </div>
               </div>
-            </motion.section>
-
-            {/* Findings List */}
-            {result.findings.length > 0 ? (
-              <motion.section
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <div className="flex items-center gap-3 mb-10">
-                  <div className="w-10 h-10 bg-primary-gold/10 rounded-sm flex items-center justify-center border border-primary-gold/20">
-                    <ShieldAlert className="text-primary-gold" size={20} />
+              <div className="w-full bg-neutral-dark/5 h-3 rounded-full overflow-hidden mb-8">
+                <motion.div initial={{ width: 0 }} animate={{ width: `${result.risk_score}%` }} transition={{ duration: 1 }} className={`h-full rounded-full ${riskBarColor(result.risk_score)}`} />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {[
+                  { label: 'Critical', count: result.summary.critical, color: 'text-red-600 bg-red-50' },
+                  { label: 'High', count: result.summary.high, color: 'text-orange-600 bg-orange-50' },
+                  { label: 'Medium', count: result.summary.medium, color: 'text-amber-600 bg-amber-50' },
+                  { label: 'Low', count: result.summary.low, color: 'text-blue-600 bg-blue-50' },
+                ].map(s => (
+                  <div key={s.label} className={`border p-4 text-center ${s.color}`}>
+                    <div className="font-title text-2xl">{s.count}</div>
+                    <div className="font-mono text-[8px] uppercase tracking-widest">{s.label}</div>
                   </div>
-                  <h2 className="font-title text-3xl">Findings</h2>
-                </div>
+                ))}
+              </div>
+            </div>
+          </motion.section>
 
-                <div className="space-y-4">
-                  {result.findings.map((finding, idx) => {
-                    const config = severityConfig[finding.severity] || severityConfig.LOW;
-                    return (
-                      <motion.div
-                        key={idx}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="bg-white border border-primary-gold/10 p-6 flex items-start gap-4"
-                      >
-                        {config.icon}
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2 flex-wrap">
-                            <span className={`font-mono text-[8px] uppercase tracking-widest px-2 py-0.5 border rounded-sm ${config.color}`}>{finding.severity}</span>
-                            <span className="font-mono text-[9px] text-neutral-dark/40">{finding.category}</span>
-                            <span className="font-mono text-[9px] text-primary-gold bg-primary-gold/10 px-2 py-0.5">{finding.file}</span>
-                            {finding.line_number && (
-                              <span className="font-mono text-[9px] text-neutral-dark/30">Line {finding.line_number}</span>
-                            )}
-                          </div>
-                          <p className="font-sans text-[13px] text-neutral-dark/60 mb-1">{finding.description}</p>
-                          <p className="font-mono text-[9px] text-primary-gold/60">{finding.legal_reference}</p>
-                          {finding.evidence && (
-                            <p className="font-mono text-[9px] text-red-500 mt-1">{finding.evidence}</p>
-                          )}
+          {result.findings.length > 0 ? (
+            <div className="space-y-4">
+               {result.findings.map((finding, idx) => {
+                 const config = severityConfig[finding.severity] || severityConfig.LOW;
+                 return (
+                   <div key={idx} className="bg-white border border-primary-gold/10 p-5 flex items-start gap-4">
+                      {config.icon}
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <span className={`font-mono text-[8px] uppercase tracking-widest px-2 py-0.5 border rounded-sm ${config.color}`}>{finding.severity}</span>
+                          <span className="font-mono text-[9px] text-neutral-dark/40">{finding.category}</span>
+                          <span className="font-mono text-[9px] text-primary-gold bg-primary-gold/10 px-1.5 py-0.5">{finding.file}</span>
+                          {finding.line_number && <span className="font-mono text-[9px] text-neutral-dark/30">Line {finding.line_number}</span>}
                         </div>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-              </motion.section>
-            ) : (
-              <div className="bg-green-50 border border-green-200 p-10 text-center">
-                <CheckCircle2 size={40} className="text-green-500 mx-auto mb-4" />
-                <h3 className="font-title text-2xl text-green-700 mb-2">All Clear</h3>
-                <p className="font-sans text-[13px] text-green-600">No breaches detected. All {result.files_scanned} files passed integrity, PII, and anomaly checks.</p>
-              </div>
-            )}
-          </>
-        )}
+                        <p className="font-sans text-xs text-neutral-dark/60 mb-1">{finding.description}</p>
+                        <p className="font-mono text-[8px] text-primary-gold/60">{finding.legal_reference}</p>
+                        {finding.evidence && <p className="font-mono text-[8px] text-red-500 mt-1">{finding.evidence}</p>}
+                      </div>
+                   </div>
+                 );
+               })}
+            </div>
+          ) : (
+            <div className="bg-green-50 border border-green-200 p-8 text-center">
+              <CheckCircle2 size={32} className="text-green-500 mx-auto mb-3" />
+              <p className="font-sans text-xs text-green-600">No breaches detected. System integrity verified.</p>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+export default function BreachDetection() {
+  return (
+    <div className="min-h-screen bg-bg-light text-neutral-dark font-sans selection:bg-primary-gold/30">
+      <Header activeTab="breach-detection" />
+      <main className="max-w-[1200px] mx-auto px-6 py-24">
+        <BreachDetectionContent />
       </main>
     </div>
   );

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import LandingPage from './LandingPage';
 import DatabaseSelection from './DatabaseSelection';
 import Dashboard from './Dashboard';
@@ -26,31 +26,31 @@ import DataLineagePage from './DataLineagePage';
 import RiskAssessment from './RiskAssessment';
 import AccessControl from './AccessControl';
 
+const router = createBrowserRouter([
+  { path: "/", element: <LandingPage /> },
+  { path: "/selection", element: <DatabaseSelection /> },
+  { path: "/dashboard", element: <Dashboard /> },
+  { path: "/compliance", element: <Compliance /> },
+  { path: "/architecture", element: <Architecture /> },
+  { path: "/legal-framework", element: <LegalFramework /> },
+  { path: "/digital-signatures", element: <DigitalSignatures /> },
+  { path: "/gdpr", element: <GDPR /> },
+  { path: "/healthcare", element: <Healthcare /> },
+  { path: "/case-studies", element: <CaseStudies /> },
+  { path: "/data-lifecycle", element: <DataLifecycle /> },
+  { path: "/data-classification", element: <DataClassification /> },
+  { path: "/penalties", element: <Penalties /> },
+  { path: "/consent", element: <ConsentManagement /> },
+  { path: "/encryption", element: <EncryptionComparison /> },
+  { path: "/audit-log", element: <AuditLog /> },
+  { path: "/breach-detection", element: <BreachDetection /> },
+  { path: "/compliance-score", element: <ComplianceScore /> },
+  { path: "/data-lineage", element: <DataLineagePage /> },
+  { path: "/risk-assessment", element: <RiskAssessment /> },
+  { path: "/access-control", element: <AccessControl /> },
+  { path: "*", element: <Navigate to="/" replace /> },
+]);
+
 export default function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/selection" element={<DatabaseSelection />} />
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/compliance" element={<Compliance />} />
-      <Route path="/architecture" element={<Architecture />} />
-      <Route path="/legal-framework" element={<LegalFramework />} />
-      <Route path="/digital-signatures" element={<DigitalSignatures />} />
-      <Route path="/gdpr" element={<GDPR />} />
-      <Route path="/healthcare" element={<Healthcare />} />
-      <Route path="/case-studies" element={<CaseStudies />} />
-      <Route path="/data-lifecycle" element={<DataLifecycle />} />
-      <Route path="/data-classification" element={<DataClassification />} />
-      <Route path="/penalties" element={<Penalties />} />
-      <Route path="/consent" element={<ConsentManagement />} />
-      <Route path="/encryption" element={<EncryptionComparison />} />
-      <Route path="/audit-log" element={<AuditLog />} />
-      <Route path="/breach-detection" element={<BreachDetection />} />
-      <Route path="/compliance-score" element={<ComplianceScore />} />
-      <Route path="/data-lineage" element={<DataLineagePage />} />
-      <Route path="/risk-assessment" element={<RiskAssessment />} />
-      <Route path="/access-control" element={<AccessControl />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
+  return <RouterProvider router={router} />;
 }

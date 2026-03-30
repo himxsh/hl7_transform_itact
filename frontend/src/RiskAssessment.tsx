@@ -40,7 +40,7 @@ const cellColor = (score: number) => {
   return 'bg-green-200 text-green-800';
 };
 
-export default function RiskAssessment() {
+export const RiskAssessmentContent = ({ isModal = false }: { isModal?: boolean }) => {
   const [data, setData] = useState<RiskData | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -49,7 +49,7 @@ export default function RiskAssessment() {
     try {
       const res = await fetch('/api/risk-assessment');
       setData(await res.json());
-    } catch {} finally { setLoading(false); }
+    } catch { } finally { setLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -61,102 +61,125 @@ export default function RiskAssessment() {
   });
 
   return (
-    <div className="min-h-screen bg-bg-light text-neutral-dark font-sans selection:bg-primary-gold/30">
-      <Header activeTab="home" />
-      <main className="max-w-[1200px] mx-auto px-6 py-24">
+    <div className="space-y-10">
+      {!isModal && (
         <div className="flex flex-col mb-16 text-center items-center">
           <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="font-title text-5xl lg:text-7xl leading-[0.9] tracking-tighter mb-8">
             Risk <span className="italic font-title text-primary-gold">Assessment</span>
           </motion.h1>
-          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="font-sans text-neutral-dark/60 max-w-xl leading-relaxed">
-            Quantified risk analysis based on NIST SP 800-30 and ISO 27005 — {data?.summary.total || 0} threats across Confidentiality, Integrity, Availability, Legal, and Operational categories.
+          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="font-sans text-neutral-dark/60 max-w-xl leading-relaxed text-sm">
+            Quantified risk analysis based on NIST SP 800-30 and ISO 27005 — {data?.summary.total || 0} threats across 5 categories.
           </motion.p>
           <button onClick={fetchData} disabled={loading} className="mt-6 flex items-center gap-2 px-6 py-3 border border-primary-gold/30 text-primary-gold font-mono text-[10px] uppercase tracking-widest hover:bg-primary-gold hover:text-[#1c1a16] transition-all disabled:opacity-50">
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
         </div>
+      )}
 
-        {data && (
-          <>
-            {/* Summary Strip */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-16">
-              {(['critical', 'high', 'medium', 'low'] as const).map(level => (
-                <div key={level} className={`border p-5 text-center ${levelColor[level.toUpperCase()]}`}>
-                  <div className="font-title text-3xl">{data.summary[level]}</div>
-                  <div className="font-mono text-[9px] uppercase tracking-widest">{level}</div>
-                </div>
-              ))}
-              <div className="bg-white border border-primary-gold/10 p-5 text-center">
-                <div className="font-title text-3xl text-primary-gold">{data.average_risk_score}</div>
-                <div className="font-mono text-[9px] uppercase tracking-widest text-neutral-dark/40">Avg Score</div>
+      {isModal && (
+        <div className="flex flex-col items-center text-center">
+          <h2 className="font-title text-3xl mb-4">Risk <span className="italic text-primary-gold">Assessment</span></h2>
+          <p className="text-neutral-dark/60 text-xs max-w-xl mb-6">ISO 27005 compliant assessment across {data?.summary.total || 0} threats.</p>
+           <button onClick={fetchData} disabled={loading} className="flex items-center gap-2 px-4 py-2 border border-primary-gold/20 text-primary-gold font-mono text-[9px] uppercase tracking-widest hover:bg-primary-gold hover:text-white transition-all disabled:opacity-50">
+            <RefreshCw size={10} className={loading ? 'animate-spin' : ''} /> Refresh
+          </button>
+        </div>
+      )}
+
+      {data && (
+        <>
+          {/* Summary Strip */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {(['critical', 'high', 'medium', 'low'] as const).map(level => (
+              <div key={level} className={`border p-4 text-center ${levelColor[level.toUpperCase()]}`}>
+                <div className="font-title text-2xl">{data.summary[level]}</div>
+                <div className="font-mono text-[8px] uppercase tracking-widest">{level}</div>
               </div>
-            </div>
-
-            {/* 5x5 Risk Heatmap */}
-            <motion.section initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="mb-16">
-              <h2 className="font-title text-2xl mb-6">Risk Heatmap <span className="font-mono text-[10px] text-neutral-dark/30">(Likelihood × Impact)</span></h2>
-              <div className="bg-white border border-primary-gold/10 p-8 inline-block">
-                <div className="flex">
-                  <div className="flex flex-col justify-between pr-3 text-right font-mono text-[9px] text-neutral-dark/40 py-1">
-                    {[5,4,3,2,1].map(n => <div key={n} className="h-14 flex items-center">{n}</div>)}
-                  </div>
-                  <div>
-                    {heatmap.map((row, ri) => (
-                      <div key={ri} className="flex gap-1 mb-1">
-                        {row.map((count, ci) => {
-                          const score = (5 - ri) * (ci + 1);
-                          return (
-                            <div key={ci} className={`w-14 h-14 flex items-center justify-center font-mono text-[11px] font-bold border ${count > 0 ? cellColor(score) : 'bg-neutral-dark/[0.02] border-neutral-dark/5 text-neutral-dark/10'}`}>
-                              {count > 0 ? count : '—'}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ))}
-                    <div className="flex gap-1 mt-2">
-                      {[1,2,3,4,5].map(n => <div key={n} className="w-14 text-center font-mono text-[9px] text-neutral-dark/40">{n}</div>)}
-                    </div>
-                    <div className="text-center font-mono text-[9px] text-neutral-dark/30 mt-1 uppercase tracking-widest">Likelihood →</div>
-                  </div>
-                </div>
-                <div className="font-mono text-[9px] text-neutral-dark/30 -rotate-90 absolute -left-6 top-1/2 uppercase tracking-widest" style={{ position: 'relative', left: -20, top: -80 }}>Impact ↑</div>
-              </div>
-            </motion.section>
-
-            {/* Threats by Category */}
-            {(Object.entries(data.categories) as [string, Threat[]][]).map(([cat, threats], catIdx) => (
-              <motion.section key={cat} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: catIdx * 0.08 }} className="mb-12">
-                <div className="flex items-center gap-3 mb-6">
-                  <Shield size={16} className="text-primary-gold" />
-                  <h3 className="font-title text-xl">{cat}</h3>
-                  <span className="font-mono text-[9px] text-neutral-dark/30">{threats.length} threats</span>
-                </div>
-                <div className="space-y-4">
-                  {threats.map((t: Threat) => (
-                    <div key={t.id} className="bg-white border border-primary-gold/10 p-6">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className="font-mono text-[10px] text-primary-gold font-bold">{t.id}</span>
-                          <span className="font-title text-[15px]">{t.name}</span>
-                          <span className={`font-mono text-[8px] uppercase tracking-widest px-2 py-0.5 border rounded-sm ${levelColor[t.risk_level]}`}>{t.risk_level}</span>
-                        </div>
-                        <div className={`w-10 h-10 flex items-center justify-center font-mono text-[13px] font-bold ${cellColor(t.risk_score)}`}>{t.risk_score}</div>
-                      </div>
-                      <p className="font-sans text-[12px] text-neutral-dark/50 mb-3">{t.description}</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-[10px] font-mono">
-                        <div><span className="text-neutral-dark/30 block">Likelihood</span><span>{t.likelihood}/5</span></div>
-                        <div><span className="text-neutral-dark/30 block">Impact</span><span>{t.impact}/5</span></div>
-                        <div><span className="text-neutral-dark/30 block">Control</span><span className="text-neutral-dark/60">{t.existing_control}</span></div>
-                        <div><span className="text-neutral-dark/30 block">Legal</span><span className="text-primary-gold">{t.legal_reference}</span></div>
-                      </div>
-                      <p className="font-mono text-[9px] text-neutral-dark/30 mt-2 italic">Residual: {t.residual_risk}</p>
-                    </div>
-                  ))}
-                </div>
-              </motion.section>
             ))}
-          </>
-        )}
+             <div className="bg-white border border-primary-gold/10 p-4 text-center">
+                <div className="font-title text-2xl text-primary-gold">{data.average_risk_score}</div>
+                <div className="font-mono text-[8px] uppercase tracking-widest text-neutral-dark/40">Avg Score</div>
+              </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* 5x5 Heatmap */}
+             <motion.section initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="bg-white border border-primary-gold/10 p-6">
+                <h3 className="font-title text-lg mb-6">Risk Heatmap</h3>
+                <div className="flex flex-col items-center">
+                  <div className="flex">
+                    <div className="flex flex-col justify-between pr-2 text-right font-mono text-[8px] text-neutral-dark/40 py-1">
+                      {[5,4,3,2,1].map(n => <div key={n} className="h-10 flex items-center">{n}</div>)}
+                    </div>
+                    <div>
+                      {heatmap.map((row, ri) => (
+                        <div key={ri} className="flex gap-1 mb-1">
+                          {row.map((count, ci) => {
+                            const score = (5 - ri) * (ci + 1);
+                            return (
+                               <div key={ci} className={`w-10 h-10 flex items-center justify-center font-mono text-[10px] font-bold border ${count > 0 ? cellColor(score) : 'bg-neutral-dark/[0.02] border-neutral-dark/5 text-neutral-dark/5'}`}>
+                                {count > 0 ? count : '—'}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                      <div className="flex gap-1 mt-1 justify-center">
+                        {[1,2,3,4,5].map(n => <div key={n} className="w-10 text-center font-mono text-[8px] text-neutral-dark/40">{n}</div>)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-4 justify-center">
+                    {Object.entries({ Critical: 20, High: 12, Medium: 6, Low: 1 }).map(([l, s]) => (
+                        <div key={l} className="flex items-center gap-1">
+                            <div className={`w-2 h-2 ${cellColor(s)}`} />
+                            <span className="font-mono text-[8px] text-neutral-dark/40">{l}</span>
+                        </div>
+                    ))}
+                </div>
+             </motion.section>
+
+             <div className="space-y-6">
+                {(Object.entries(data.categories) as [string, Threat[]][]).slice(0, 3).map(([cat, threats], catIdx) => (
+                  <motion.section key={cat} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: catIdx * 0.05 }} className="border border-primary-gold/10 p-6 bg-white">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-title text-md flex items-center gap-2">
+                        <Shield size={14} className="text-primary-gold" /> {cat}
+                      </h4>
+                      <span className="font-mono text-[9px] text-neutral-dark/30">{threats.length} threats</span>
+                    </div>
+                    <div className="space-y-4">
+                      {threats.slice(0, 2).map((t: Threat) => (
+                        <div key={t.id} className="border-t border-primary-gold/5 pt-3">
+                           <div className="flex justify-between items-start mb-1">
+                              <span className="font-title text-sm">{t.name}</span>
+                              <span className={`font-mono text-[8px] uppercase tracking-widest px-1.5 py-0.5 border rounded-sm ${levelColor[t.risk_level]}`}>{t.risk_level}</span>
+                           </div>
+                           <p className="font-sans text-[11px] text-neutral-dark/50 leading-tight mb-2">{t.description}</p>
+                           <div className="flex gap-4 font-mono text-[8px]">
+                              <div><span className="text-neutral-dark/20 block">Control</span><span className="text-neutral-dark/60">{t.existing_control}</span></div>
+                              <div><span className="text-neutral-dark/20 block">Legal</span><span className="text-primary-gold">{t.legal_reference}</span></div>
+                           </div>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.section>
+                ))}
+             </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default function RiskAssessment() {
+  return (
+    <div className="min-h-screen bg-bg-light text-neutral-dark font-sans selection:bg-primary-gold/30">
+      <Header activeTab="risk-assessment" />
+      <main className="max-w-[1200px] mx-auto px-6 py-24">
+        <RiskAssessmentContent />
       </main>
     </div>
   );

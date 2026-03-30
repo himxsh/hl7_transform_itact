@@ -3,15 +3,16 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useRef } from 'react';
-import { 
-  ShieldAlert, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  ShieldAlert,
   ChevronRight,
   Terminal,
   Settings
 } from 'lucide-react';
-import { motion } from 'motion/react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate, useLocation, useBlocker } from 'react-router-dom';
+import SecurityModal from './SecurityModal';
 
 // --- Types ---
 interface PatientRecord {
@@ -26,7 +27,7 @@ interface PatientRecord {
 }
 
 // --- Sub-components ---
-const StatCard = ({ label, value, subValue, color = 'text-white' }: { label: string, value: string | number, subValue?: string, color?: string }) => (
+const StatCard: React.FC<{ label: string, value: string | number, subValue?: string, color?: string }> = ({ label, value, subValue, color = 'text-white' }) => (
   <div className="glass-panel p-5 border-l-2 border-l-gold">
     <div className="text-white/40 text-[10px] uppercase tracking-[0.15em] mb-2 font-sans">{label}</div>
     <div className="flex items-baseline space-x-2">
@@ -38,27 +39,39 @@ const StatCard = ({ label, value, subValue, color = 'text-white' }: { label: str
 
 const PipelineStage = ({ label, active, completed }: { label: string, active: boolean, completed: boolean }) => (
   <div className="flex flex-col items-center space-y-3 bg-charcoal px-4 relative z-10">
-    <div className={`w-4 h-4 rounded-full border-4 border-charcoal-light transition-all duration-500 ${
-      completed 
-        ? 'bg-ok-green shadow-[0_0_15px_rgba(106,158,114,0.6)]' 
-        : active 
-          ? 'bg-gold shadow-[0_0_15px_rgba(184,168,130,0.6)] animate-pulse' 
+    <div className={`w-4 h-4 rounded-full border-4 border-charcoal-light transition-all duration-500 ${completed
+        ? 'bg-ok-green shadow-[0_0_15px_rgba(106,158,114,0.6)]'
+        : active
+          ? 'bg-gold shadow-[0_0_15px_rgba(184,168,130,0.6)] animate-pulse'
           : 'bg-charcoal-light'
-    }`}></div>
-    <span className={`text-[10px] uppercase tracking-wider transition-colors ${
-      completed || active ? 'text-white' : 'text-white/30'
-    }`}>{label}</span>
+      }`}></div>
+    <span className={`text-[10px] uppercase tracking-wider transition-colors ${completed || active ? 'text-white' : 'text-white/30'
+      }`}>{label}</span>
   </div>
 );
 
-const LogEntry = ({ time, file, status, warning = false }: { time: string, file: string, status: string, warning?: boolean }) => (
-  <div className="flex items-center justify-between border-b border-ui-border/10 pb-2.5">
+interface LogEntryProps {
+  time: string;
+  file: string;
+  status: string;
+  warning?: boolean;
+}
+
+const LogEntry: React.FC<LogEntryProps> = ({ time, file, status, warning = false }) => (
+  <motion.div
+    initial={{ opacity: 0, x: -10 }}
+    animate={{ opacity: 1, x: 0 }}
+    className="flex items-center justify-between border-b border-ui-border/10 pb-2.5"
+  >
     <div className="flex space-x-3">
-      <span className="text-white/30">[{time}]</span>
+      <span className="text-white/30 font-mono">[{time}]</span>
       <span className="text-white/70">{file}</span>
     </div>
-    <span className={warning ? 'text-warn-amber' : 'text-ok-green'}>{status}</span>
-  </div>
+    <div className="flex items-center space-x-2">
+      <span className={warning ? 'text-warn-amber' : 'text-ok-green'}>{status}</span>
+      <div className={`w-1 h-1 rounded-full ${warning ? 'bg-warn-amber' : 'bg-ok-green'} animate-pulse`} />
+    </div>
+  </motion.div>
 );
 
 const ConfigItem = ({ label, value }: { label: string, value: string }) => (
@@ -79,31 +92,66 @@ export default function Dashboard() {
   const [hl7Content, setHl7Content] = useState<string>('');
   const [activeFile, setActiveFile] = useState<string>('');
   const [tableHeaders, setTableHeaders] = useState<string[]>([]);
+  const [validationLogs, setValidationLogs] = useState<{time: string, file: string, status: string}[]>([]);
+  const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+  const logContainerRef = useRef<HTMLDivElement>(null);
   const headersInitialized = useRef(false);
+  const hasRunRef = useRef(false);
+  
+  // Navigation Blocker for internal routing (React Router)
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      (isProcessing || records.length > 0) &&
+      currentLocation.pathname !== nextLocation.pathname
+  );
+
+  useEffect(() => {
+    if (blocker.state === "blocked") {
+      const proceed = window.confirm("Progress Detected: Navigating away will terminate the current session and all unsaved progress (live stream records) will be lost. Continue?");
+      if (proceed) {
+        blocker.proceed();
+      } else {
+        blocker.reset();
+      }
+    }
+  }, [blocker]);
+
+  // Warning for browser refresh / close button
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isProcessing || records.length > 0) {
+        e.preventDefault();
+        e.returnValue = "You have unsaved orchestration progress. Refreshing will terminate the session.";
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isProcessing, records.length]);
 
   const runPipeline = async () => {
-    if (isProcessing) return;
+    if (isProcessing || hasRunRef.current) return;
+    hasRunRef.current = true;
     setIsProcessing(true);
-    setRecords([]); 
+    setRecords([]);
     setTableHeaders([]);
     headersInitialized.current = false;
     setCurrentStage(0);
-    
+
     try {
-      const { dataset, sampleSize, filePath } = (location.state as any) || { dataset: 'mimic', sampleSize: 50 };
+      const { dataset, sampleSize, filePath } = (location.state as { dataset: string; sampleSize: number; filePath?: string }) || { dataset: 'mimic', sampleSize: 50 };
       const isMIMIC = dataset.toLowerCase().includes('mimic');
 
       if (isMIMIC) {
-        setTableHeaders(['Subject ID', 'Pseudonym', 'Sex', 'Cohort', 'Lab Events', 'Output', 'Seal']);
+        setTableHeaders(['Subject ID', 'Pseudonym', 'Sex', 'Cohort', 'Lab Events', 'Output']);
         headersInitialized.current = true;
       }
-      
+
       const response = await fetch('/api/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataset, sampleSize, filePath })
       });
-      
+
       const reader = response.body?.getReader();
       if (!reader) return;
 
@@ -120,34 +168,67 @@ export default function Dashboard() {
 
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
-          
+
           try {
             const data = JSON.parse(line.slice(6));
-            
+
             if (data.status === 'progress') {
               setCurrentStage(data.stage);
             } else if (data.status === 'processing') {
               if (currentStage < 2) setCurrentStage(2);
             } else if (data.status === 'completed') {
               if (!isMIMIC && data.record.raw_data && !headersInitialized.current) {
-                const featureKeys = Object.keys(data.record.raw_data).filter(k => 
+                const featureKeys = Object.keys(data.record.raw_data).filter(k =>
                   !['id', 'Dataset'].includes(k)
                 );
-                setTableHeaders(['Subject ID', 'Pseudonym', 'Sex', ...featureKeys, 'Output', 'Seal']);
+                setTableHeaders(['Subject ID', 'Pseudonym', 'Sex', ...featureKeys, 'Output']);
                 headersInitialized.current = true;
               }
 
-              setRecords(prev => {
-                const updated = [...prev, data.record];
-                if (updated.length === 1) fetchHL7(data.record.output);
-                return updated;
-              });
-              setCurrentStage(3);
+                setRecords(prev => {
+                  if (prev.find(r => r.id === data.record.id)) return prev;
+                  const updated = [...prev, data.record];
+                  console.log(`[DEBUG] Dashboard Record Added: ${data.record.id} (Current Count: ${updated.length})`);
+                  if (updated.length === 1) fetchHL7(data.record.output);
+                  return updated;
+                });
+                
+                // Add to real-time integrity log
+                setValidationLogs(prev => [
+                  ...prev,
+                  {
+                    time: new Date().toLocaleTimeString([], { hour12: false }),
+                    file: data.record.output,
+                    status: 'PASS'
+                  }
+                ]);
+                
+                setCurrentStage(3);
             } else if (data.status === 'success') {
               setCurrentStage(4);
             }
           } catch (e) {
             console.error('Error parsing stream line:', e);
+          }
+        }
+      }
+
+      // Process any remaining data in the buffer after stream completion
+      if (buffer.trim()) {
+        const line = buffer;
+        if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.status === 'completed') {
+              setRecords(prev => {
+                if (prev.find(r => r.id === data.record.id)) return prev;
+                return [...prev, data.record];
+              });
+            } else if (data.status === 'success') {
+              setCurrentStage(4);
+            }
+          } catch (e) {
+            console.error('Error parsing trailing buffer:', e);
           }
         }
       }
@@ -161,6 +242,12 @@ export default function Dashboard() {
   useEffect(() => {
     runPipeline();
   }, []);
+
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [validationLogs]);
 
   const fetchHL7 = async (filename: string) => {
     try {
@@ -180,7 +267,7 @@ export default function Dashboard() {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b border-ui-border flex items-center justify-between px-8 bg-charcoal/80 backdrop-blur-md sticky top-0 z-30">
           <div className="flex items-center space-x-4">
-            <button 
+            <button
               onClick={() => navigate('/selection')}
               className="p-2 hover:bg-white/5 rounded-full transition-colors text-white/50 hover:text-gold group"
             >
@@ -194,9 +281,18 @@ export default function Dashboard() {
 
           <div className="flex items-center space-x-6">
             <div className="flex flex-col items-end">
-              <span className={`px-2 py-0.5 ${isProcessing ? 'bg-gold/10 text-gold animate-pulse' : 'bg-green-500/10 text-ok-green'} border border-current/20 text-[9px] uppercase tracking-tighter mb-1 rounded`}>
-                {isProcessing ? 'Pipeline Active' : 'Orchestration Complete'}
-              </span>
+              {currentStage === 4 ? (
+                <button
+                  onClick={() => setIsSecurityModalOpen(true)}
+                  className="px-3 py-1 bg-ok-green text-charcoal border border-ok-green/50 text-[10px] font-bold uppercase tracking-tight mb-1 rounded hover:bg-white hover:border-white transition-all shadow-[0_0_15px_rgba(106,158,114,0.4)]"
+                >
+                  Orchestration Complete → View Audit
+                </button>
+              ) : isProcessing ? (
+                <span className="px-2 py-0.5 bg-gold/10 text-gold animate-pulse border border-gold/20 text-[9px] uppercase tracking-tighter mb-1 rounded">
+                  Pipeline Active
+                </span>
+              ) : null}
               <span className="text-[10px] technical-data text-white/40">{selectedDataset}</span>
             </div>
           </div>
@@ -236,9 +332,12 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="technical-data text-[11px] divide-y divide-ui-border/5">
-                    {records.map((record) => (
-                      <tr 
-                        key={record.id} 
+                    {records.map((record, idx) => (
+                      <motion.tr
+                        key={record.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.2 }}
                         onClick={() => fetchHL7(record.output)}
                         className={`hover:bg-gold/5 transition-colors group cursor-pointer ${activeFile === record.output ? 'bg-gold/10' : ''}`}
                       >
@@ -251,17 +350,12 @@ export default function Dashboard() {
                             <td className="px-4 py-3.5">{record.labEvents}</td>
                           </>
                         ) : (
-                          tableHeaders.slice(3, -2).map(header => (
+                          tableHeaders.slice(3, -1).map(header => (
                             <td key={header} className="px-4 py-3.5">{record.raw_data?.[header] || '—'}</td>
                           ))
                         )}
                         <td className="px-4 py-3.5 text-white/60 whitespace-nowrap">{record.output}</td>
-                        <td className="px-4 py-3.5 text-right">
-                          <span className={`px-2 py-0.5 rounded-sm text-[9px] border ${
-                            record.seal === 'Valid' ? 'bg-ok-green/10 text-ok-green border-ok-green/30' : 'bg-warn-amber/10 text-warn-amber border-warn-amber/30'
-                          }`}>{record.seal}</span>
-                        </td>
-                      </tr>
+                      </motion.tr>
                     ))}
                     {records.length === 0 && (
                       <tr>
@@ -300,10 +394,31 @@ export default function Dashboard() {
                   <ShieldAlert size={14} className="text-gold" />
                   <h3 className="text-gold uppercase tracking-[0.2em] text-[11px]">Integrity Validation Log</h3>
                 </div>
-                <div className="space-y-4 technical-data text-[10px]">
-                  <LogEntry time="10:31:02" file="PROC_10006.hl7" status="PASS" />
-                  <LogEntry time="10:31:05" file="PROC_10012.hl7" status="PASS" />
-                  <LogEntry time="10:31:18" file="PROC_10051.hl7" status="PASS" />
+                <div 
+                  ref={logContainerRef}
+                  className="space-y-4 technical-data text-[10px] h-[260px] overflow-y-auto pr-2 scrollbar-hide flex flex-col"
+                >
+                  <AnimatePresence initial={false}>
+                    {validationLogs.map((log, i) => (
+                      <LogEntry key={`${log.file}-${i}`} time={log.time} file={log.file} status={log.status} />
+                    ))}
+                  </AnimatePresence>
+                  
+                  {isProcessing && (
+                    <motion.div 
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="flex items-center space-x-3 text-white/20 px-1 py-1 shrink-0"
+                    >
+                      <div className="w-2 h-2 rounded-full bg-gold/40 animate-pulse" />
+                      <span className="uppercase tracking-[0.2em] text-[8px] italic animate-pulse">Scanning Next Record...</span>
+                    </motion.div>
+                  )}
+                  
+                  {validationLogs.length === 0 && !isProcessing && (
+                    <div className="text-white/10 italic text-center py-4">Waiting for validation events...</div>
+                  )}
                 </div>
               </section>
 
@@ -316,13 +431,18 @@ export default function Dashboard() {
                   <ConfigItem label="Execution Mode" value="Batch / Automated" />
                   <ConfigItem label="Input Source" value={selectedDataset} />
                   <ConfigItem label="Anonymization" value="Mapping: Indo-Surnames" />
-                  <ConfigItem label="Output Format" value="v2.5.1 Pipe Delimited" />
+                  <ConfigItem label="Output Format" value="v0.0.1 Pipe Delimited" />
                 </div>
               </section>
             </div>
           </div>
         </main>
       </div>
+
+      <SecurityModal 
+        isOpen={isSecurityModalOpen} 
+        onClose={() => setIsSecurityModalOpen(false)} 
+      />
     </div>
   );
 }
