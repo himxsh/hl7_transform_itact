@@ -23,14 +23,15 @@ A privacy-first, compliance-ready HL7 v2.5.1 message generation pipeline built o
     - [Phase 2 — Privacy Layer](#phase-2--privacy-layer)
     - [Phase 3 — Security Layer](#phase-3--security-layer)
     - [Phase 4 — Orchestration and Validation](#phase-4--orchestration-and-validation)
+    - [Phase 5 — Modern Security Dashboard (React)](#phase-5--modern-security-dashboard-react)
+  - [Frontend Architecture](#frontend-architecture)
   - [Project Structure](#project-structure)
   - [Requirements](#requirements)
   - [Installation](#installation)
     - [From PyPI (original library only)](#from-pypi-original-library-only)
     - [From source (this fork, with all additions)](#from-source-this-fork-with-all-additions)
   - [Usage](#usage)
-    - [Run original MIMIC-IV pipeline](#run-original-mimic-iv-pipeline)
-    - [Run generic CSV pipeline](#run-generic-csv-pipeline)
+    - [Run the Modern Dashboard](#run-the-modern-dashboard)
     - [Validate output integrity](#validate-output-integrity)
     - [Use the library API directly](#use-the-library-api-directly)
     - [CLI (original library)](#cli-original-library)
@@ -76,7 +77,7 @@ The original library was designed for message routing and testing — it had no 
 - **DPDP Act 2023 §8(7)** — data fiduciaries must de-identify personal data where the actual identity is not required for the processing purpose.
 - **IT Act 2000 §43A / §72A** — organisations handling sensitive personal data must implement reasonable security practices; wrongful disclosure is a criminal offence.
 
-We added **five new components** to address these requirements, following the **Open/Closed Principle** — none of the original five library files were modified.
+We added **six new phases** to address these requirements, including a **Modern Web Dashboard** for real-time monitoring and compliance auditing. None of the original library files were modified.
 
 ### Architecture Overview
 
@@ -84,11 +85,11 @@ We added **five new components** to address these requirements, following the **
 MIMIC-IV CSVs ──► preprocess_mimic.py ──► merged DataFrame
                                                │
                         JSON mapping file ◄────┘
-                               │
+                                │
                    HL7Mapping.from_json()
-                               │
-                      HL7Transform(mapping)
-                               │
+                                │
+                       HL7Transform(mapping)
+                                │
                     for each patient row:
                       HL7Message.new()
                            │
@@ -104,7 +105,18 @@ MIMIC-IV CSVs ──► preprocess_mimic.py ──► merged DataFrame
                            │
                     output/<subject_id>.hl7
                            │
-              validate_integrity.py         (post-hoc verification)
+              ┌────────────┴─────────────┐
+              │                          │
+      validate_integrity.py      Modern Security Dashboard
+      (post-hoc verification)    (React + Vite + FastAPI)
+                                         │
+                         ┌───────────────┴───────────────┐
+                         │   Security & Compliance Center  │
+                         └───────────────────────────────┘
+                                         │
+                ┌────────────┬───────────┼───────────┬────────────┐
+                │            │           │           │            │
+          Audit Log   Breach Scan   Data Lineage   Risk Matrix   RBAC
 ```
 
 Both injection points wrap the original library — the library itself is never touched.
@@ -200,6 +212,34 @@ read MIMIC-IV data → build HL7 message → anonymize PII → sign with ZSH →
 
 ---
 
+### Phase 5 — Modern Security Dashboard (React)
+
+**Directory:** `frontend/`
+
+A high-performance React + Vite dashboard that provides real-time visualization of the pipeline status and deep-dive compliance analytics.
+
+- **Real-time Monitoring**: SSE-based (Server-Sent Events) progress tracking for both MIMIC and Generic pipelines.
+- **Security & Compliance Center**: A centralized modal housing:
+  - **Audit Log**: JSON-structured compliance trail (§67C).
+  - **Multi-Algorithm Comparison**: Side-by-side performance metrics for SHA-256, AES-256, HMAC-SHA512, and SHA3-256.
+  - **Breach Detection**: Automated scanning for PII leaks using deterministic entropy checks.
+  - **Risk Assessment**: Dynamic 5x5 risk matrix calculating impact vs. likelihood.
+  - **Data Lineage**: Visual graph tracing data from source CSV columns to HL7 segments.
+  - **Access Control**: RBAC simulation for Clinical Investigators, Data Fiduciaries, and Auditors.
+- **Navigation Guard**: Integrated `useBlocker` protection to prevent data loss during active orchestration.
+
+---
+
+## Frontend Architecture
+
+The frontend is built with **React 18**, **Vite**, **Tailwind CSS**, and **Framer Motion**.
+
+- **State Management**: React Context / Hooks for pipeline synchronization.
+- **Micro-Animations**: Layout transitions and real-time status indicators.
+- **Modular Components**: Each security feature is a decoupled `*Content` component, allowing 100% feature parity between the standalone pages and the Dashboard modal.
+
+---
+
 ## Project Structure
 
 ```
@@ -264,7 +304,19 @@ python setup.py install
 
 ## Usage
 
-### Run original MIMIC-IV pipeline
+### Run the Modern Dashboard
+
+```bash
+# Terminal 1: Backend
+python app.py
+
+# Terminal 2: Frontend
+cd frontend
+npm install
+npm run dev
+```
+
+The dashboard will be available at `http://localhost:5173`.
 
 ```bash
 python main.py --type mimic

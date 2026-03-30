@@ -1,10 +1,40 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, BookOpen, Scale, Shield, Heart, Globe } from 'lucide-react';
 import Header from './Header';
+import { useState, useEffect } from 'react';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    legal_sections: '20+',
+    offences: '14',
+    case_studies: '9',
+    course_units: '5',
+    records_processed: '0',
+    compliance_index: '--',
+    risk_threats: '--',
+    system_state: 'SECURE'
+  });
+
+  useEffect(() => {
+    fetch('/api/stats')
+      .then(res => res.json())
+      .then(data => {
+        setStats({
+          legal_sections: data.legal_sections.toString(),
+          offences: data.offences.toString(),
+          case_studies: data.case_studies.toString(),
+          course_units: '5',
+          records_processed: data.records_processed.toString(),
+          compliance_index: data.compliance_index.toString(),
+          risk_threats: data.risk_threats.toString(),
+          system_state: data.system_state
+        });
+      })
+      .catch(() => { });
+  }, []);
+
   return (
     <div className="bg-[#f7f7f6] text-[#1c1a16] font-sans selection:bg-gold/30">
       <Header activeTab="home" />
@@ -112,6 +142,32 @@ export default function LandingPage() {
           </div>
         </div>
 
+        {/* Regulatory Coverage Stats */}
+        <section className="max-w-[1440px] mx-auto px-6 lg:px-12 py-16 border-b border-gold/10">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+            {[
+              { stat: stats.legal_sections, label: 'Legal Sections Mapped', sub: `Score: ${stats.compliance_index}%` },
+              { stat: stats.offences, label: 'Offences Catalogued', sub: 'IT Act §43–§72A' },
+              { stat: stats.records_processed, label: 'Records Processed', sub: `State: ${stats.system_state}` },
+              { stat: stats.risk_threats, label: 'Risk Threats', sub: 'Quantified Index' },
+              { stat: stats.course_units, label: 'Course Units', sub: 'Full Syllabus Coverage' },
+            ].map((item, idx) => (
+              <motion.div
+                key={item.label}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.08 }}
+                className="text-center"
+              >
+                <div className="font-title text-4xl lg:text-5xl text-gold mb-2">{item.stat}</div>
+                <div className="font-sans text-sm font-medium text-neutral-dark mb-1">{item.label}</div>
+                <div className="font-mono text-[9px] uppercase tracking-widest text-slate-400">{item.sub}</div>
+              </motion.div>
+            ))}
+          </div>
+        </section>
+
         {/* Pipeline Grid */}
         <section id="pipeline" className="max-w-[1440px] mx-auto px-6 lg:px-12 py-24 border-b border-gold/10">
           <div className="flex flex-col mb-16">
@@ -182,63 +238,50 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* Compliance Detailed */}
-        <section id="compliance" className="max-w-[1440px] mx-auto px-6 lg:px-12 py-24">
-          <div className="grid lg:grid-cols-2 gap-24 items-center">
-            <div className="relative">
-              <div className="absolute -top-12 -left-12 font-title text-[200px] leading-none text-gold/5 select-none pointer-events-none">§</div>
-              <div className="relative z-10 space-y-16">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                >
-                  <h3 className="font-title text-3xl font-light mb-4 tracking-tight">DPDP Act 2023 Compliance</h3>
-                  <p className="font-sans text-slate-500 leading-relaxed max-w-md">Strict adherence to Digital Personal Data Protection mandates, featuring automated 'right to erasure' and purpose limitation protocols.</p>
-                  <span className="font-mono text-[10px] text-gold/60 mt-4 block uppercase tracking-wider">§8: Duties of Data Fiduciary</span>
-                  <button
-                    onClick={() => navigate('/compliance')}
-                    className="mt-8 px-6 py-3 border border-gold/30 text-gold font-mono text-[10px] uppercase tracking-widest hover:bg-gold hover:text-charcoal transition-all"
-                  >
-                    Read More
-                  </button>
-                </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.1 }}
-                >
-                  <h3 className="font-title text-3xl font-light mb-4 tracking-tight">IT Act 2000 Validation</h3>
-                  <p className="font-sans text-slate-500 leading-relaxed max-w-md">Governance framework for electronic records and digital signatures, ensuring legal validity for processed clinical reports.</p>
-                  <span className="font-mono text-[10px] text-gold/60 mt-4 block uppercase tracking-wider">§43: Penalty for Damage to Computer System</span>
-                  <button
-                    onClick={() => navigate('/compliance')}
-                    className="mt-8 px-6 py-3 border border-gold/30 text-gold font-mono text-[10px] uppercase tracking-widest hover:bg-gold hover:text-charcoal transition-all"
-                  >
-                    Read More
-                  </button>
-                </motion.div>
-              </div>
-            </div>
-            <div className="bg-charcoal p-1">
-              <div className="aspect-square bg-white/5 flex flex-col items-center justify-center border border-white/10 relative overflow-hidden">
-                <div className="absolute inset-0 opacity-20 pointer-events-none">
-                  <img
-                    alt="Cybersecurity grid"
-                    className="w-full h-full object-cover grayscale"
-                    src="https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&q=80&w=1000"
-                    referrerPolicy="no-referrer"
-                  />
+        {/* Course Unit Coverage */}
+        <section className="max-w-[1440px] mx-auto px-6 lg:px-12 py-24 border-b border-gold/10">
+          <div className="flex flex-col mb-16 text-center items-center">
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="font-title text-4xl font-light mb-4"
+            >
+              <span className="italic font-title text-gold">Coverage</span>
+            </motion.h2>
+            <div className="w-24 h-px bg-gold"></div>
+            <p className="font-sans text-slate-500 mt-6 max-w-xl leading-relaxed">
+              Comprehensive mapping to all 5 units of ECE-4272: IT Act and Data Protection
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            {[
+              { unit: 'I', title: 'Foundations', desc: 'Data definitions, privacy principles, legislative timeline', icon: <BookOpen size={24} className="text-gold" />, href: '/legal-framework' },
+              { unit: 'II', title: 'IT Act 2000', desc: 'Digital signatures, e-governance, cyber offences', icon: <Scale size={24} className="text-gold" />, href: '/digital-signatures' },
+              { unit: 'III', title: 'DPDP Act', desc: 'Personal data, consent, cross-border transfers', icon: <Shield size={24} className="text-gold" />, href: '/data-lifecycle' },
+              { unit: 'IV', title: 'GDPR', desc: 'Data subject rights, penalties, comparison', icon: <Globe size={24} className="text-gold" />, href: '/gdpr' },
+              { unit: 'V', title: 'Healthcare', desc: 'NeHA, SeHA, DISHA, data ownership', icon: <Heart size={24} className="text-gold" />, href: '/healthcare' },
+            ].map((item, idx) => (
+              <motion.a
+                key={item.unit}
+                href={item.href}
+                initial={{ opacity: 0, y: 15 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.08 }}
+                className="bg-white border border-gold/10 p-8 group hover:border-gold/30 transition-all cursor-pointer block"
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="font-mono text-[10px] text-gold bg-gold/10 px-2 py-1 border border-gold/20">UNIT {item.unit}</span>
                 </div>
-                <div className="relative z-10 text-center">
-                  <ShieldCheck size={64} strokeWidth={1} className="text-gold mb-6 mx-auto" />
-                  <div className="font-mono text-xs tracking-[0.5em] text-white">SYSTEM_STATE: SECURE</div>
-                </div>
-              </div>
-            </div>
+                <div className="mb-4">{item.icon}</div>
+                <h3 className="font-title text-xl mb-2 group-hover:text-gold transition-colors">{item.title}</h3>
+                <p className="font-sans text-[12px] text-slate-500 leading-relaxed">{item.desc}</p>
+              </motion.a>
+            ))}
           </div>
         </section>
+
       </main>
 
       {/* Footer */}

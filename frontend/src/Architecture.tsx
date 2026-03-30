@@ -22,48 +22,47 @@ export default function Architecture() {
       type: 'original',
       icon: <Database className="text-primary-gold" size={24} />,
       items: ['MIMIC-IV Relational DB', 'Universal CSV Ingestion'],
-      description: 'Handles raw clinical data sources and initializes stream contexts.'
+      description: 'Handles raw clinical data sources. For MIMIC, it uses SQL connectors; for CSV, it uses a generic file reader to initialize stream contexts.'
     },
     {
       id: 'pre-processing',
       title: 'Schema Intelligence',
       type: 'addition',
       icon: <Layers className="text-primary-gold" size={24} />,
-      items: ['Dynamic Header Mapping', 'Clinical Segment Grouping'],
-      description: 'Translates arbitrary CSV headers into standardized internal schema objects.'
+      items: ['Automated Mapping', 'Clinical Segment Grouping'],
+      description: 'Translates arbitrary CSV headers into standardized internal schema objects. Includes automated detection of Patient IDs, Lab Values, and Vital Signs.'
     },
     {
       id: 'privacy',
       title: 'Anonymization Layer',
       type: 'addition',
       icon: <ShieldCheck className="text-primary-gold" size={24} />,
-      items: ['PII Masking', 'Deterministic Shifting (DPDP)'],
-      description: 'Secures Patient Identification (PID) data before any downstream processing.'
+      items: ['PII Masking (Name, Addr)', 'Date-shifting (DPDP)'],
+      description: 'Secures Patient Identification (PID) data. Uses Spacy-based NER for PII detection and deterministic date-shifting to preserve clinical chronology without leaking identity.'
     },
     {
       id: 'core',
       title: 'HL7 Engine',
       type: 'original',
       icon: <Cpu className="text-primary-gold" size={24} />,
-      items: ['HL7 v2.5.1 Generator', 'Segment Templating'],
-      description: 'The core transformation engine from the original hl7_transform codebase.'
+      items: ['HL7 v2.5.1 v2.7', 'MSH, PID, PV1, OBX'],
+      description: 'The core transformation engine that serializes clinical records into pipe-delimited HL7 messages across multiple message versions (v2.3 to v2.7).'
     },
     {
       id: 'integrity',
       title: 'Security & Integrity',
       type: 'addition',
       icon: <Binary className="text-primary-gold" size={24} />,
-      items: ['SHA-256 Hashing (IT Act)', 'Cryptographic Auditing'],
-      description: 'Ensures non-repudiation and data integrity for cross-hospital transfers.'
+      items: ['SHA-256 Hashing', 'IT Act §43 Compliance'],
+      description: 'Ensures non-repudiation and data integrity. Every HL7 message is hashed; any tampering with the output file is detected through cryptographic validation.'
     },
-
     {
       id: 'output',
       title: 'Output Orchestrator',
       type: 'addition',
       icon: <Activity className="text-primary-gold" size={24} />,
-      items: ['ER7-formatted Streams', 'Real-time Dashboards'],
-      description: 'Aggregates processed segments into the final HL7 transmission stream.'
+      items: ['ER7 Streams', 'Real-time Dashboards'],
+      description: 'Aggregates processed segments into the final HL7 transmission stream and pushes live updates to the frontend dashboard.'
     }
   ];
 

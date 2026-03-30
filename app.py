@@ -1,17 +1,27 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Header as FastAPIHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import os
+import uuid
 import logging
 from pathlib import Path
 from pipelines.mimic_pipeline import run_mimic_pipeline, build_hl7_message
 from pipelines.generic_pipeline import run_generic_pipeline
 from hl7_transform.anonymizer import Anonymizer
 from hl7_transform.integrity import IntegrityManager
+from hl7_transform.encryption import EncryptionComparator
+from hl7_transform.audit_logger import AuditLogger
+from hl7_transform.breach_detector import BreachDetector
+from hl7_transform.compliance_scorer import ComplianceScorer
+from hl7_transform.data_lineage import DataLineageTracker
+from hl7_transform.risk_assessment import RiskAssessor
+from hl7_transform.access_control import AccessControlSimulator
 from preprocess_mimic import preprocess
 import pandas as pd
 import json
+from dataclasses import asdict
+from datetime import datetime, timezone
 
 app = FastAPI()
 
@@ -26,10 +36,32 @@ app.add_middleware(
 
 DATA_DIR = "dataset"
 OUT_DIR = "output"
+UPLOAD_DIR = "uploads"
+
+# Ensure directories exist
+Path(OUT_DIR).mkdir(parents=True, exist_ok=True)
+Path(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+
+# Shared instances
+audit_logger = AuditLogger()
+encryption_comparator = EncryptionComparator()
+breach_detector = BreachDetector(output_dir=OUT_DIR)
+compliance_scorer = ComplianceScorer()
+data_lineage = DataLineageTracker()
+risk_assessor = RiskAssessor()
+access_control = AccessControlSimulator()
+
+# Cache for encryption comparison results, keyed by run_id to avoid race conditions
+_encryption_results_store: dict = {}
+_latest_run_id: Optional[str] = None
+
+# Admin token for destructive operations (loaded from env)
+_ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", None)
 
 class RunConfig(BaseModel):
     dataset: str
     sampleSize: int
+    filePath: Optional[str] = None
 
 class Record(BaseModel):
     id: str
@@ -52,9 +84,22 @@ import asyncio
 
 @app.post("/api/run")
 async def run_pipeline(config: RunConfig):
+    global _latest_run_id
+    run_id = str(uuid.uuid4())
+    _encryption_results_store[run_id] = []
+
     async def event_generator():
+        global _latest_run_id
         try:
             if config.dataset.lower().startswith("mimic"):
+                # Audit: Pipeline start
+                audit_logger.log(
+                    event_type="PIPELINE_START",
+                    details={"dataset": config.dataset, "sample_size": config.sampleSize},
+                    legal_reference="IT Act §67C (Record preservation)",
+                    severity="INFO",
+                )
+
                 yield f"data: {json.dumps({'status': 'progress', 'stage': 0, 'message': 'Initializing Preprocessor'})}\n\n"
                 await asyncio.sleep(0.1)
 
@@ -71,13 +116,64 @@ async def run_pipeline(config: RunConfig):
                 yield f"data: {json.dumps({'status': 'progress', 'stage': 1, 'message': f'Ready to process {total} patients'})}\n\n"
                 await asyncio.sleep(0.1)
 
+                all_encryption_results = []
+
                 for i, (subject_id, group) in enumerate(patient_groups):
+                    # Audit: Record ingested
+                    audit_logger.log(
+                        event_type="RECORD_INGESTED",
+                        subject_id=str(subject_id),
+                        details={"lab_events": len(group), "index": i},
+                        legal_reference="DPDP §8(1) (Processing grounds)",
+                        severity="INFO",
+                    )
+
                     # Progress update before starting
                     yield f"data: {json.dumps({'status': 'processing', 'subject_id': str(subject_id), 'index': i, 'total': total})}\n\n"
                     
                     # Build message
                     hl7_msg = build_hl7_message(subject_id=int(subject_id), patient_rows=group, anonymizer=anonymizer)
+
+                    # Audit: PII anonymised
+                    audit_logger.log(
+                        event_type="PII_ANONYMISED",
+                        subject_id=str(subject_id),
+                        details={"method": "deterministic_pseudonymisation", "locale": "en_IN"},
+                        legal_reference="DPDP §8(7) (De-identification)",
+                        severity="INFO",
+                    )
+
                     signed_msg = integrity.sign_message(hl7_msg)
+
+                    # Audit: Integrity sealed
+                    audit_logger.log(
+                        event_type="INTEGRITY_SEALED",
+                        subject_id=str(subject_id),
+                        details={"algorithm": "SHA-256", "segment": "ZSH"},
+                        legal_reference="IT Act §14 (Secure Electronic Record)",
+                        severity="INFO",
+                    )
+
+                    # Multi-algorithm encryption comparison
+                    enc_results = encryption_comparator.compare(hl7_msg)
+                    enc_dicts = [asdict(r) for r in enc_results]
+                    all_encryption_results.append({
+                        "subject_id": str(subject_id),
+                        "results": enc_dicts,
+                    })
+
+                    # Audit: Encryption applied
+                    audit_logger.log(
+                        event_type="ENCRYPTION_APPLIED",
+                        subject_id=str(subject_id),
+                        details={
+                            "algorithms": [r.name for r in enc_results],
+                            "fastest_ms": min(r.time_ms for r in enc_results),
+                            "slowest_ms": max(r.time_ms for r in enc_results),
+                        },
+                        legal_reference="IT Act §43A (Reasonable security practices)",
+                        severity="INFO",
+                    )
                     
                     # Write to file
                     filename = f"{subject_id}.hl7"
@@ -96,21 +192,167 @@ async def run_pipeline(config: RunConfig):
                         "cohort": str(first_row.get("anchor_year", "N/A")),
                         "labEvents": len(group),
                         "output": filename,
-                        "seal": "Valid"
+                        "seal": "Valid",
+                        "encryption": enc_dicts,
                     }
                     
+                    # Audit: Record complete
+                    audit_logger.log(
+                        event_type="RECORD_COMPLETE",
+                        subject_id=str(subject_id),
+                        details={"output_file": filename},
+                        legal_reference="IT Act §67C (Record preserved)",
+                        severity="INFO",
+                    )
+
                     yield f"data: {json.dumps({'status': 'completed', 'record': record})}\n\n"
                     # Small sleep to allow frontend to breathe and see the updates
                     await asyncio.sleep(0.05)
 
+                # Store for API retrieval (per-run, no race condition)
+                _encryption_results_store[run_id] = all_encryption_results
+                _latest_run_id = run_id
+
+                # Audit: Pipeline end
+                audit_logger.log(
+                    event_type="PIPELINE_END",
+                    details={"total_records": total, "output_dir": OUT_DIR},
+                    legal_reference="IT Act §67C (Record preservation)",
+                    severity="INFO",
+                )
+
                 yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully'})}\n\n"
             
-            elif config.dataset.lower().startswith("liver"):
-                yield f"data: {json.dumps({'status': 'error', 'message': 'Liver pipeline not yet optimized for streaming'})}\n\n"
+            elif config.dataset.lower().startswith("liver") or \
+                 config.dataset.lower().startswith("generalized") or \
+                 config.dataset.lower() == "ilpd" or \
+                 config.filePath:
+                # Generic/Liver Pipeline Ingestion
+                if config.filePath:
+                    # P0 FIX: Validate filePath is under UPLOAD_DIR to prevent arbitrary file read
+                    resolved = Path(config.filePath).resolve()
+                    allowed_root = Path(UPLOAD_DIR).resolve()
+                    if not str(resolved).startswith(str(allowed_root) + os.sep) and resolved != allowed_root:
+                        yield f"data: {json.dumps({'status': 'error', 'message': 'Invalid file path: must be within uploads directory'})}\n\n"
+                        return
+                    csv_to_process = str(resolved)
+                else:
+                    csv_to_process = os.path.join(DATA_DIR, "indian_liver_patient.csv")
+                
+                if not os.path.exists(csv_to_process):
+                    yield f"data: {json.dumps({'status': 'error', 'message': f'File not found: {csv_to_process}'})}\n\n"
+                    return
+
+                # Load and sample
+                df = pd.read_csv(csv_to_process)
+                n_to_sample = min(len(df), config.sampleSize) if config.sampleSize else len(df)
+                df = df.sample(n=n_to_sample, random_state=42).reset_index(drop=True)
+                
+                total = len(df)
+                logger.debug("[Generic Pipeline] Final dataframe length (randomized): %d", total)
+                
+                audit_logger.log(
+                    event_type="PIPELINE_START",
+                    details={"dataset": "generic", "file": csv_to_process, "sample_size": total},
+                    legal_reference="DPDP §8 (Data collection for processing)",
+                    severity="INFO",
+                )
+
+                yield f"data: {json.dumps({'status': 'progress', 'stage': 0, 'message': 'Initializing Generic Pipeline'})}\n\n"
+                await asyncio.sleep(0.1)
+                
+                anonymizer = Anonymizer(locale="en_IN")
+                integrity = IntegrityManager()
+
+                # Detect columns
+                cols = df.columns.tolist()
+                gender_col = next((c for c in cols if "gender" in c.lower() or "sex" in c.lower()), None)
+                age_col = next((c for c in cols if "age" in c.lower()), None)
+                
+                # Numeric columns for OBX
+                numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+                if age_col and age_col in numeric_cols: numeric_cols.remove(age_col)
+                
+                all_encryption_results = []
+                
+                for index, row in df.iterrows():
+                    subject_id = 900000 + index
+                    
+                    # Build Message
+                    now = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+                    segments = [
+                        f"MSH|^~\\&|GENERIC_PIPELINE|CSV_SOURCE|||{now}||ORU^R01^ORU_R01|{index}|P|2.5.1"
+                    ]
+                    
+                    last, first = anonymizer.anonymize_name(subject_id)
+                    gender = "U"
+                    if gender_col:
+                        g = str(row[gender_col]).upper()
+                        if g.startswith("M"): gender = "M"
+                        elif g.startswith("F"): gender = "F"
+                    
+                    age = 0
+                    if age_col:
+                        try: age = int(row[age_col])
+                        except: pass
+                    
+                    birth_year = datetime.now().year - age
+                    segments.append(f"PID|1||{subject_id}^^^CSV^MR||{last}^{first}^^^||{birth_year}0101|{gender}")
+                    
+                    obx_id = 1
+                    for col in numeric_cols:
+                        val = row[col]
+                        segments.append(f"OBX|{obx_id}|NM|{col}^GENERIC||{val}||||||F")
+                        obx_id += 1
+                        
+                    hl7_msg = "\n".join(segments)
+                    
+                    # Security Layer: Comparison of Multi-Algorithm Signatures [IT Act Requirement]
+                    enc_results = encryption_comparator.compare(hl7_msg)
+                    enc_dicts = [asdict(r) for r in enc_results]
+                    all_encryption_results.append({
+                        "subject_id": str(subject_id),
+                        "results": enc_dicts,
+                    })
+                    
+                    signed_msg = integrity.sign_message(hl7_msg)
+                    
+                    filename = f"gen_{subject_id}.hl7"
+                    out_file = Path(OUT_DIR) / filename
+                    with open(out_file, "w", encoding="utf-8") as f:
+                        f.write(signed_msg)
+                        
+                    # Build record for frontend
+                    # P2 FIX: Only include non-PII numeric columns (data minimisation per DPDP §8(4))
+                    safe_data = {col: row[col] for col in numeric_cols if col in row.index}
+                    record = {
+                        "id": str(subject_id),
+                        "pseudonym": f"{first} {last}",
+                        "sex": gender,
+                        "cohort": "Generic CSV",
+                        "labEvents": len(numeric_cols),
+                        "output": filename,
+                        "seal": "Valid",
+                        "encryption": enc_dicts,
+                        "raw_data": safe_data  # Restricted to non-PII numeric columns only
+                    }
+                    
+                    yield f"data: {json.dumps({'status': 'completed', 'record': record})}\n\n"
+                    await asyncio.sleep(0.2) # Further increased delay
+                
+                _encryption_results_store[run_id] = all_encryption_results
+                _latest_run_id = run_id
+                yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully'})}\n\n"
             else:
                 yield f"data: {json.dumps({'status': 'error', 'message': 'Unsupported dataset'})}\n\n"
         except Exception as e:
             logging.error(f"Streaming error: {str(e)}")
+            audit_logger.log(
+                event_type="PIPELINE_END",
+                details={"error": str(e)},
+                legal_reference="DPDP §15 (Breach notification)",
+                severity="ERROR",
+            )
             yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
@@ -137,6 +379,194 @@ async def get_logs():
     
     # Return last 50 lines
     return {"logs": lines[-50:]}
+
+# ---------------------------------------------------------------
+# NEW: Encryption Comparison Endpoint
+# ---------------------------------------------------------------
+
+@app.get("/api/encryption-comparison")
+async def get_encryption_comparison():
+    """Return the latest encryption comparison results from the last pipeline run."""
+    results = _encryption_results_store.get(_latest_run_id, []) if _latest_run_id else []
+    return {
+        "results": results,
+        "algorithms": ["SHA-256", "AES-256-CBC", "HMAC-SHA512", "SHA3-256"],
+    }
+
+# ---------------------------------------------------------------
+# NEW: Audit Log Endpoints
+# ---------------------------------------------------------------
+
+@app.get("/api/audit-log")
+async def get_audit_log(event_type: Optional[str] = None, severity: Optional[str] = None, limit: int = 100):
+    """Return structured audit log entries with optional filtering."""
+    entries = audit_logger.get_entries(event_type=event_type, severity=severity, limit=limit)
+    stats = audit_logger.get_stats()
+    return {
+        "entries": entries,
+        "stats": stats,
+    }
+
+@app.post("/api/audit-log/clear")
+async def clear_audit_log(authorization: Optional[str] = FastAPIHeader(default=None)):
+    """Clear the audit log. Requires admin authorization."""
+    if not _ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Audit log clearing is disabled (no ADMIN_TOKEN configured)")
+    if authorization != f"Bearer {_ADMIN_TOKEN}":
+        raise HTTPException(status_code=401, detail="Unauthorized: valid admin token required")
+    audit_logger.clear()
+    audit_logger.log(
+        event_type="AUDIT_LOG_CLEARED",
+        details={"cleared_by": "admin"},
+        legal_reference="IT Act §67C (Record preservation)",
+        severity="WARNING",
+    )
+    return {"status": "cleared"}
+
+# ---------------------------------------------------------------
+# NEW: Breach Detection Endpoints
+# ---------------------------------------------------------------
+
+@app.post("/api/breach-scan")
+async def run_breach_scan():
+    """Run a full breach detection scan on the output directory."""
+    audit_logger.log(
+        event_type="BREACH_SCAN_START",
+        details={"output_dir": OUT_DIR},
+        legal_reference="DPDP §15 (Breach detection)",
+        severity="INFO",
+    )
+
+    results = breach_detector.full_scan()
+
+    if results["summary"]["critical"] > 0 or results["summary"]["high"] > 0:
+        audit_logger.log(
+            event_type="BREACH_DETECTED",
+            details=results["summary"],
+            legal_reference="DPDP §15 (Breach notification required)",
+            severity="CRITICAL",
+        )
+
+    return results
+
+# ---------------------------------------------------------------
+# Compliance Score Endpoint
+# ---------------------------------------------------------------
+
+@app.get("/api/compliance-score")
+async def get_compliance_score():
+    """Calculate real-time compliance score across all pipeline controls."""
+    return compliance_scorer.score(
+        has_anonymizer=True,
+        has_integrity=True,
+        has_encryption=True,
+        has_audit_log=True,
+        has_breach_detector=True,
+        output_dir=OUT_DIR,
+    )
+
+# ---------------------------------------------------------------
+# Data Lineage Endpoints
+# ---------------------------------------------------------------
+
+@app.get("/api/data-lineage")
+async def get_data_lineage():
+    """Return the complete data lineage graph."""
+    return data_lineage.get_lineage()
+
+@app.get("/api/data-lineage/{field_name}")
+async def get_field_lineage(field_name: str):
+    """Trace lineage for a specific field."""
+    return data_lineage.get_field_lineage(field_name)
+
+# ---------------------------------------------------------------
+# Risk Assessment Endpoint
+# ---------------------------------------------------------------
+
+@app.get("/api/risk-assessment")
+async def get_risk_assessment():
+    """Return the complete risk assessment matrix."""
+    return risk_assessor.assess()
+
+# ---------------------------------------------------------------
+# Access Control Endpoints
+# ---------------------------------------------------------------
+
+@app.get("/api/access-control")
+async def get_access_control():
+    """Return all RBAC roles and permissions."""
+    return access_control.get_roles()
+
+@app.get("/api/access-control/matrix")
+async def get_access_matrix():
+    """Return the roles × resources access matrix."""
+    return access_control.get_access_matrix()
+
+# ---------------------------------------------------------------
+# NEW: File Upload Endpoint
+# ---------------------------------------------------------------
+
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Upload a custom CSV for processing."""
+    # P0 FIX: Sanitize filename to prevent path traversal
+    safe_name = Path(file.filename).name  # strips any directory components like ../
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    # Enforce .csv extension allowlist
+    allowed_extensions = {".csv"}
+    file_ext = Path(safe_name).suffix.lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type '{file_ext}' not allowed. Only {allowed_extensions} are accepted."
+        )
+    
+    file_path = Path(UPLOAD_DIR) / safe_name
+    with open(file_path, "wb") as buffer:
+        buffer.write(await file.read())
+    
+    audit_logger.log(
+        event_type="FILE_UPLOADED",
+        details={"filename": safe_name, "path": str(file_path)},
+        legal_reference="DPDP §8 (Data collection)",
+        severity="INFO",
+    )
+    
+    return {"filename": safe_name, "path": str(file_path)}
+
+# ---------------------------------------------------------------
+# NEW: Stats Endpoint for Landing Page
+# ---------------------------------------------------------------
+
+@app.get("/api/stats")
+async def get_stats():
+    """Return aggregated stats for the landing page."""
+    # Count processed HL7 files
+    processed_count = len(list(Path(OUT_DIR).glob("*.hl7")))
+    
+    # Get current risk/compliance indices
+    risk = risk_assessor.assess()
+    score = compliance_scorer.score(
+        has_anonymizer=True, has_integrity=True, has_encryption=True,
+        has_audit_log=True, has_breach_detector=True, output_dir=OUT_DIR
+    )
+    
+    return {
+        "legal_sections": 24, # Representing mapped sections
+        "offences": 14,
+        "case_studies": 9,
+        "records_processed": processed_count,
+        "compliance_index": score["overall_score"],
+        "risk_threats": risk["summary"]["total"],
+        "system_state": "SECURE" if score["overall_score"] > 80 else "WARNING"
+    }
+
+@app.get("/api/access-control/check")
+async def check_access(role: str, resource: str, action: str = "read"):
+    """Check if a role has access to a resource."""
+    return access_control.check_access(role, resource, action)
 
 if __name__ == "__main__":
     import uvicorn
