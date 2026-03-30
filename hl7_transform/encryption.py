@@ -44,10 +44,32 @@ except ImportError:
 
 logger = logging.getLogger("hl7_pipeline.encryption")
 
-# Fixed HMAC key for demo purposes — in production this would be
-# loaded from a secure vault (AWS KMS, Azure Key Vault, etc.)
-_HMAC_KEY = b"HL7-ORCHESTRATOR-ITACT-HMAC-SECRET-KEY-2026"
-_AES_KEY = hashlib.sha256(b"HL7-ORCHESTRATOR-AES-KEY-2026").digest()  # 32 bytes
+# Cryptographic keys — MUST be loaded from environment variables or a secret store.
+# Never hardcode keys in source control.
+_HMAC_KEY_ENV = os.environ.get("HL7_HMAC_KEY")
+_AES_KEY_ENV = os.environ.get("HL7_AES_KEY")
+
+
+def _get_hmac_key() -> bytes:
+    """Load HMAC key from environment, with fallback for dev/demo mode."""
+    if _HMAC_KEY_ENV:
+        return _HMAC_KEY_ENV.encode("utf-8")
+    logger.warning(
+        "[EncryptionComparator] HL7_HMAC_KEY not set — using insecure demo key. "
+        "Set HL7_HMAC_KEY env var for production use."
+    )
+    return b"INSECURE-DEMO-KEY-DO-NOT-USE-IN-PRODUCTION"
+
+
+def _get_aes_key() -> bytes:
+    """Load AES key from environment, with fallback for dev/demo mode."""
+    if _AES_KEY_ENV:
+        return hashlib.sha256(_AES_KEY_ENV.encode("utf-8")).digest()  # 32 bytes
+    logger.warning(
+        "[EncryptionComparator] HL7_AES_KEY not set — using insecure demo key. "
+        "Set HL7_AES_KEY env var for production use."
+    )
+    return hashlib.sha256(b"INSECURE-DEMO-KEY-DO-NOT-USE-IN-PRODUCTION").digest()
 
 
 @dataclass
@@ -131,33 +153,43 @@ class EncryptionComparator:
     @staticmethod
     def _run_aes_256(data: bytes) -> AlgorithmResult:
         start = time.perf_counter()
+        aes_key = _get_aes_key()
         if HAS_CRYPTO:
             iv = os.urandom(16)
-            cipher = AES.new(_AES_KEY, AES.MODE_CBC, iv)
+            cipher = AES.new(aes_key, AES.MODE_CBC, iv)
             ct = cipher.encrypt(pad(data, AES.block_size))
             output_hex = (iv + ct).hex()
+            algo_name = "AES-256-CBC"
+            algo_type = "cipher"
         else:
-            # Fallback: simulate AES with SHA-512 chaining
-            h = hashlib.sha512(data + _AES_KEY).hexdigest()
+            # Fallback: PyCryptodome not installed — clearly mark as unavailable
+            logger.warning(
+                "[EncryptionComparator] PyCryptodome not installed. "
+                "AES-256-CBC is UNAVAILABLE. Using SHA-512 simulation for demo only."
+            )
+            h = hashlib.sha512(data + aes_key).hexdigest()
             output_hex = h * (len(data) // len(h) + 1)
             output_hex = output_hex[:len(data) * 2]  # approx size
+            algo_name = "AES-256-CBC (UNAVAILABLE — SHA-512 SIMULATION)"
+            algo_type = "simulation"
         elapsed = (time.perf_counter() - start) * 1000
 
         return AlgorithmResult(
-            name="AES-256-CBC",
+            name=algo_name,
             time_ms=round(elapsed, 4),
             output_size_bytes=len(output_hex) // 2,
             digest_preview=output_hex[:16],
             full_digest=output_hex[:64] + "...",
             legal_reference="IT Act §43A (Reasonable Security Practices)",
-            algorithm_type="cipher",
+            algorithm_type=algo_type,
             key_size_bits=256,
         )
 
     @staticmethod
     def _run_hmac_sha512(data: bytes) -> AlgorithmResult:
         start = time.perf_counter()
-        digest = hmac.new(_HMAC_KEY, data, hashlib.sha512).hexdigest()
+        hmac_key = _get_hmac_key()
+        digest = hmac.new(hmac_key, data, hashlib.sha512).hexdigest()
         elapsed = (time.perf_counter() - start) * 1000
 
         return AlgorithmResult(
@@ -168,7 +200,7 @@ class EncryptionComparator:
             full_digest=digest,
             legal_reference="DPDP §8(7) (De-identification Assurance)",
             algorithm_type="mac",
-            key_size_bits=len(_HMAC_KEY) * 8,
+            key_size_bits=len(hmac_key) * 8,
         )
 
     @staticmethod

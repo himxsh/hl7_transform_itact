@@ -34,6 +34,7 @@ PEP 8 compliant. Thread-safe via file locking.
 import json
 import logging
 import os
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -49,6 +50,8 @@ class AuditLogger:
 
     Each entry is a JSON object appended to a JSON array in the
     audit log file. The file is created if it does not exist.
+    Thread-safe via a threading.Lock to prevent concurrent
+    read-modify-write races (IT Act §67C compliance).
 
     Parameters
     ----------
@@ -59,6 +62,7 @@ class AuditLogger:
 
     def __init__(self, log_path: Optional[str] = None) -> None:
         self.log_path = Path(log_path or AUDIT_LOG_FILE)
+        self._lock = threading.Lock()
         self._ensure_file()
         logger.info(
             "[AuditLogger] Initialized  path=%s  [IT Act §67C]",
@@ -81,6 +85,9 @@ class AuditLogger:
     ) -> Dict[str, Any]:
         """
         Append a structured audit entry.
+
+        Thread-safe: uses a lock to prevent concurrent read-modify-write
+        races that would silently drop audit entries.
 
         Parameters
         ----------
@@ -111,17 +118,18 @@ class AuditLogger:
             "severity": severity,
         }
 
-        # Read existing entries and append
-        try:
-            with open(self.log_path, "r") as f:
-                entries = json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            entries = []
+        # Thread-safe read-modify-write with lock (P1 fix for IT Act §67C)
+        with self._lock:
+            try:
+                with open(self.log_path, "r") as f:
+                    entries = json.load(f)
+            except (json.JSONDecodeError, FileNotFoundError):
+                entries = []
 
-        entries.append(entry)
+            entries.append(entry)
 
-        with open(self.log_path, "w") as f:
-            json.dump(entries, f, indent=2)
+            with open(self.log_path, "w") as f:
+                json.dump(entries, f, indent=2)
 
         logger.info(
             "[AuditLogger] %s  subject=%s  severity=%s  [%s]",

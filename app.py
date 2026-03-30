@@ -1,8 +1,9 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Header as FastAPIHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import os
+import uuid
 import logging
 from pathlib import Path
 from pipelines.mimic_pipeline import run_mimic_pipeline, build_hl7_message
@@ -50,8 +51,12 @@ data_lineage = DataLineageTracker()
 risk_assessor = RiskAssessor()
 access_control = AccessControlSimulator()
 
-# Cache for latest encryption comparison results
-_latest_encryption_results: list = []
+# Cache for encryption comparison results, keyed by run_id to avoid race conditions
+_encryption_results_store: dict = {}
+_latest_run_id: Optional[str] = None
+
+# Admin token for destructive operations (loaded from env)
+_ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", None)
 
 class RunConfig(BaseModel):
     dataset: str
@@ -79,11 +84,12 @@ import asyncio
 
 @app.post("/api/run")
 async def run_pipeline(config: RunConfig):
-    global _latest_encryption_results
-    _latest_encryption_results = []
+    global _latest_run_id
+    run_id = str(uuid.uuid4())
+    _encryption_results_store[run_id] = []
 
     async def event_generator():
-        global _latest_encryption_results
+        global _latest_run_id
         try:
             if config.dataset.lower().startswith("mimic"):
                 # Audit: Pipeline start
@@ -203,8 +209,9 @@ async def run_pipeline(config: RunConfig):
                     # Small sleep to allow frontend to breathe and see the updates
                     await asyncio.sleep(0.05)
 
-                # Store for API retrieval
-                _latest_encryption_results = all_encryption_results
+                # Store for API retrieval (per-run, no race condition)
+                _encryption_results_store[run_id] = all_encryption_results
+                _latest_run_id = run_id
 
                 # Audit: Pipeline end
                 audit_logger.log(
@@ -221,7 +228,16 @@ async def run_pipeline(config: RunConfig):
                  config.dataset.lower() == "ilpd" or \
                  config.filePath:
                 # Generic/Liver Pipeline Ingestion
-                csv_to_process = config.filePath if config.filePath else os.path.join(DATA_DIR, "indian_liver_patient.csv")
+                if config.filePath:
+                    # P0 FIX: Validate filePath is under UPLOAD_DIR to prevent arbitrary file read
+                    resolved = Path(config.filePath).resolve()
+                    allowed_root = Path(UPLOAD_DIR).resolve()
+                    if not str(resolved).startswith(str(allowed_root) + os.sep) and resolved != allowed_root:
+                        yield f"data: {json.dumps({'status': 'error', 'message': 'Invalid file path: must be within uploads directory'})}\n\n"
+                        return
+                    csv_to_process = str(resolved)
+                else:
+                    csv_to_process = os.path.join(DATA_DIR, "indian_liver_patient.csv")
                 
                 if not os.path.exists(csv_to_process):
                     yield f"data: {json.dumps({'status': 'error', 'message': f'File not found: {csv_to_process}'})}\n\n"
@@ -233,7 +249,7 @@ async def run_pipeline(config: RunConfig):
                 df = df.sample(n=n_to_sample, random_state=42).reset_index(drop=True)
                 
                 total = len(df)
-                print(f"[DEBUG] Final dataframe length (randomized): {total}")
+                logger.debug("[Generic Pipeline] Final dataframe length (randomized): %d", total)
                 
                 audit_logger.log(
                     event_type="PIPELINE_START",
@@ -307,6 +323,8 @@ async def run_pipeline(config: RunConfig):
                         f.write(signed_msg)
                         
                     # Build record for frontend
+                    # P2 FIX: Only include non-PII numeric columns (data minimisation per DPDP §8(4))
+                    safe_data = {col: row[col] for col in numeric_cols if col in row.index}
                     record = {
                         "id": str(subject_id),
                         "pseudonym": f"{first} {last}",
@@ -316,13 +334,14 @@ async def run_pipeline(config: RunConfig):
                         "output": filename,
                         "seal": "Valid",
                         "encryption": enc_dicts,
-                        "raw_data": row.to_dict() # Include actual CSV features for dynamic UI
+                        "raw_data": safe_data  # Restricted to non-PII numeric columns only
                     }
                     
                     yield f"data: {json.dumps({'status': 'completed', 'record': record})}\n\n"
                     await asyncio.sleep(0.2) # Further increased delay
                 
-                _latest_encryption_results = all_encryption_results
+                _encryption_results_store[run_id] = all_encryption_results
+                _latest_run_id = run_id
                 yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully'})}\n\n"
             else:
                 yield f"data: {json.dumps({'status': 'error', 'message': 'Unsupported dataset'})}\n\n"
@@ -368,8 +387,9 @@ async def get_logs():
 @app.get("/api/encryption-comparison")
 async def get_encryption_comparison():
     """Return the latest encryption comparison results from the last pipeline run."""
+    results = _encryption_results_store.get(_latest_run_id, []) if _latest_run_id else []
     return {
-        "results": _latest_encryption_results,
+        "results": results,
         "algorithms": ["SHA-256", "AES-256-CBC", "HMAC-SHA512", "SHA3-256"],
     }
 
@@ -388,9 +408,19 @@ async def get_audit_log(event_type: Optional[str] = None, severity: Optional[str
     }
 
 @app.post("/api/audit-log/clear")
-async def clear_audit_log():
-    """Clear the audit log."""
+async def clear_audit_log(authorization: Optional[str] = FastAPIHeader(default=None)):
+    """Clear the audit log. Requires admin authorization."""
+    if not _ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Audit log clearing is disabled (no ADMIN_TOKEN configured)")
+    if authorization != f"Bearer {_ADMIN_TOKEN}":
+        raise HTTPException(status_code=401, detail="Unauthorized: valid admin token required")
     audit_logger.clear()
+    audit_logger.log(
+        event_type="AUDIT_LOG_CLEARED",
+        details={"cleared_by": "admin"},
+        legal_reference="IT Act §67C (Record preservation)",
+        severity="WARNING",
+    )
     return {"status": "cleared"}
 
 # ---------------------------------------------------------------
@@ -479,18 +509,32 @@ async def get_access_matrix():
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
     """Upload a custom CSV for processing."""
-    file_path = Path(UPLOAD_DIR) / file.filename
+    # P0 FIX: Sanitize filename to prevent path traversal
+    safe_name = Path(file.filename).name  # strips any directory components like ../
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    # Enforce .csv extension allowlist
+    allowed_extensions = {".csv"}
+    file_ext = Path(safe_name).suffix.lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type '{file_ext}' not allowed. Only {allowed_extensions} are accepted."
+        )
+    
+    file_path = Path(UPLOAD_DIR) / safe_name
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
     
     audit_logger.log(
         event_type="FILE_UPLOADED",
-        details={"filename": file.filename, "path": str(file_path)},
+        details={"filename": safe_name, "path": str(file_path)},
         legal_reference="DPDP §8 (Data collection)",
         severity="INFO",
     )
     
-    return {"filename": file.filename, "path": str(file_path)}
+    return {"filename": safe_name, "path": str(file_path)}
 
 # ---------------------------------------------------------------
 # NEW: Stats Endpoint for Landing Page

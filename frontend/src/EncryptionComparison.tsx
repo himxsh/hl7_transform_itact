@@ -22,7 +22,7 @@ interface RecordComparison {
 export const algorithmInfo = [
   { name: 'SHA-256', type: 'Hash', bits: 256, standard: 'NIST FIPS 180-4', useCase: 'Tamper-evidence (our ZSH segment)', color: 'bg-blue-100 text-blue-700 border-blue-300' },
   { name: 'AES-256-CBC', type: 'Symmetric Cipher', bits: 256, standard: 'NIST FIPS 197', useCase: 'Encryption at rest — reversible', color: 'bg-amber-100 text-amber-700 border-amber-300' },
-  { name: 'HMAC-SHA512', type: 'MAC', bits: 352, standard: 'RFC 2104', useCase: 'Key-bound authentication + integrity', color: 'bg-green-100 text-green-700 border-green-300' },
+  { name: 'HMAC-SHA512', type: 'MAC', bits: 512, standard: 'RFC 2104', useCase: 'Key-bound authentication + integrity', color: 'bg-green-100 text-green-700 border-green-300' },
   { name: 'SHA3-256', type: 'Hash', bits: 256, standard: 'NIST FIPS 202', useCase: 'Future-proof Keccak-family hash', color: 'bg-purple-100 text-purple-700 border-purple-300' },
 ];
 
