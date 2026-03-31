@@ -168,3 +168,14 @@ plan.md
 audit_log.json
 presentation_guide.md
 flow.pen
+
+# LaTeX build artifacts
+*.aux
+*.fdb_latexmk
+*.fls
+*.out
+*.toc
+*.log
+*.synctex.gz
+lnmiit_logo.png
+project_report.tex
