@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown } from 'lucide-react';
@@ -17,6 +17,11 @@ interface HeaderProps {
 export default function Header({ activeTab }: HeaderProps) {
   const [legalOpen, setLegalOpen] = useState(false);
   const legalRef = useRef<HTMLDivElement>(null);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -52,7 +57,7 @@ export default function Header({ activeTab }: HeaderProps) {
   return (
     <header className="fixed top-0 w-full z-50 bg-[#f7f7f6]/80 backdrop-blur-md border-b border-gold/10">
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-5 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+        <Link to="/" onClick={() => window.scrollTo(0, 0)} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <span className="font-title text-2xl tracking-tight font-light uppercase text-[#1c1a16]">
             HL7 <span className="italic lowercase font-title">Orchestrator</span>
           </span>
@@ -62,6 +67,7 @@ export default function Header({ activeTab }: HeaderProps) {
             <Link
               key={item.id}
               to={item.path}
+              onClick={() => window.scrollTo(0, 0)}
               className={`relative py-1 transition-colors hover:text-gold ${activeTab === item.id ? 'text-gold' : ''
                 }`}
             >
@@ -107,7 +113,10 @@ export default function Header({ activeTab }: HeaderProps) {
                     <Link
                       key={page.id}
                       to={page.path}
-                      onClick={() => setLegalOpen(false)}
+                      onClick={() => {
+                        window.scrollTo(0, 0);
+                        setLegalOpen(false);
+                      }}
                       className={`block px-5 py-2.5 text-[10px] uppercase tracking-[0.15em] transition-all hover:bg-gold/5 hover:text-gold ${activeTab === page.id ? 'text-gold bg-gold/5' : 'text-slate-600'
                         }`}
                     >

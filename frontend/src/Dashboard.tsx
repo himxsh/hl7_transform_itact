@@ -13,6 +13,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useLocation, useBlocker } from 'react-router-dom';
 import SecurityModal from './SecurityModal';
+import Footer from './Footer';
 
 // --- Types ---
 interface PatientRecord {
@@ -94,6 +95,7 @@ export default function Dashboard() {
   const [tableHeaders, setTableHeaders] = useState<string[]>([]);
   const [validationLogs, setValidationLogs] = useState<{time: string, file: string, status: string}[]>([]);
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
+  const [showExitWarning, setShowExitWarning] = useState(false);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const headersInitialized = useRef(false);
   const hasRunRef = useRef(false);
@@ -107,14 +109,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (blocker.state === "blocked") {
-      const proceed = window.confirm("Progress Detected: Navigating away will terminate the current session and all unsaved progress (live stream records) will be lost. Continue?");
-      if (proceed) {
-        blocker.proceed();
-      } else {
-        blocker.reset();
-      }
+      setShowExitWarning(true);
     }
-  }, [blocker]);
+  }, [blocker.state]);
 
   // Warning for browser refresh / close button
   useEffect(() => {
@@ -436,6 +433,10 @@ export default function Dashboard() {
               </section>
             </div>
           </div>
+          
+          <div className="-mx-8 -mb-8 mt-16">
+            <Footer />
+          </div>
         </main>
       </div>
 
@@ -443,6 +444,52 @@ export default function Dashboard() {
         isOpen={isSecurityModalOpen} 
         onClose={() => setIsSecurityModalOpen(false)} 
       />
+
+      <AnimatePresence>
+        {showExitWarning && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="glass-panel p-8 max-w-md border-l-4 border-l-warn-amber shadow-2xl"
+            >
+              <h3 className="text-warn-amber text-lg font-title mb-4 flex items-center">
+                <ShieldAlert className="mr-2" size={20} />
+                Leave Dashboard?
+              </h3>
+              <p className="text-white/70 text-sm mb-6 leading-relaxed">
+                Navigating away will terminate the current orchestration session. All generated live stream records and visualization state on this page will be cleared.
+              </p>
+              <div className="flex justify-end space-x-4">
+                <button 
+                  onClick={() => {
+                    if (blocker.state === 'blocked') blocker.reset();
+                    setShowExitWarning(false);
+                  }}
+                  className="px-4 py-2 text-white/50 hover:text-white transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    if (blocker.state === 'blocked') blocker.proceed();
+                    setShowExitWarning(false);
+                  }}
+                  className="px-6 py-2 bg-warn-amber text-charcoal font-bold uppercase tracking-widest text-[11px] rounded hover:bg-white transition-colors"
+                >
+                  Confirm & Leave
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
