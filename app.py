@@ -139,6 +139,10 @@ async def process_instant(
                 l_buf = get_file_from_archive(content, "labevents.csv")
                 d_buf = get_file_from_archive(content, "d_labitems.csv")
                 
+                # Initialize required tools for stateless processing
+                anonymizer = Anonymizer(locale="en_IN")
+                integrity = IntegrityManager()
+
                 if not (p_buf and l_buf and d_buf):
                     # Fallback to .gz versions
                     p_buf = get_file_from_archive(content, "patients.csv.gz")
@@ -152,10 +156,12 @@ async def process_instant(
                 merged_df = preprocess_from_buffers(p_buf, l_buf, d_buf, sample_size=sampleSize)
                 
                 # HL7 transformation logic for MIMIC
+                # HL7 transformation logic for MIMIC
                 for subject_id in merged_df['subject_id'].unique():
                     patient_data = merged_df[merged_df['subject_id'] == subject_id]
-                    # Note: Using existing build_hl7_message for mimic
-                    hl7_msg = build_hl7_message(patient_data)
+                    # Fix: Pass correct arguments to build_hl7_message
+                    hl7_msg = build_hl7_message(int(subject_id), patient_data, anonymizer)
+                    signed_msg = integrity.sign_message(hl7_msg)
                     
                     # Generate metadata compatible with Dashboard.tsx
                     metadata = {
@@ -167,7 +173,7 @@ async def process_instant(
                         "output": f"mimic_{subject_id}.hl7",
                         "seal": "Valid"
                     }
-                    results.append({"signed_msg": hl7_msg, "metadata": metadata})
+                    results.append({"signed_msg": signed_msg, "metadata": metadata})
 
             # --- Mode 2: Generalized (CSV/Excel) ---
             else:
@@ -214,7 +220,12 @@ async def process_instant(
             raise HTTPException(status_code=400, detail="No data provided")
 
         # Log completion (Privacy-compliant audit)
-        audit_logger.log_event("Stateless Session Completed", {"mode": mode, "count": len(results)})
+        audit_logger.log(
+            event_type="PIPELINE_END",
+            details={"mode": mode, "count": len(results)},
+            legal_reference="IT Act §67C (Stateless preserve)",
+            severity="INFO"
+        )
         
         return {"status": "success", "records": results}
 
