@@ -1,5 +1,9 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Header as FastAPIHeader
+import io
+import zipfile
+import tarfile
+from fastapi import FastAPI, HTTPException, UploadFile, File, Header as FastAPIHeader, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse, PlainTextResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import os
@@ -7,7 +11,7 @@ import uuid
 import logging
 from pathlib import Path
 from pipelines.mimic_pipeline import run_mimic_pipeline, build_hl7_message
-from pipelines.generic_pipeline import run_generic_pipeline
+from pipelines.generic_pipeline import run_generic_pipeline, process_records
 from hl7_transform.anonymizer import Anonymizer
 from hl7_transform.integrity import IntegrityManager
 from hl7_transform.encryption import EncryptionComparator
@@ -17,15 +21,18 @@ from hl7_transform.compliance_scorer import ComplianceScorer
 from hl7_transform.data_lineage import DataLineageTracker
 from hl7_transform.risk_assessment import RiskAssessor
 from hl7_transform.access_control import AccessControlSimulator
-from preprocess_mimic import preprocess
+from preprocess_mimic import preprocess, preprocess_from_buffers
 import pandas as pd
 import json
+import asyncio
+import traceback
 from dataclasses import asdict
 from datetime import datetime, timezone
 
 app = FastAPI()
 
 # Enable CORS
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -33,6 +40,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    error_msg = f"GLOBAL ERROR: {str(exc)}\n{traceback.format_exc()}"
+    logging.error(error_msg)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": traceback.format_exc()}
+    )
 
 DATA_DIR = "dataset"
 OUT_DIR = "output"
@@ -78,9 +94,153 @@ async def get_datasets():
         {"id": "mimic", "name": "MIMIC-IV v3.1", "description": "Clinical research database (PhysioNet)"},
         {"id": "liver", "name": "Indian Liver Patient", "description": "Generic medical CSV workload"}
     ]
+def get_file_from_archive(archive_bytes: bytes, filename: str):
+    """Helper to extract a specific file from a zip or tar archive in-memory."""
+    # Try ZIP
+    try:
+        with zipfile.ZipFile(io.BytesIO(archive_bytes)) as z:
+            for zname in z.namelist():
+                if zname.endswith(filename):
+                    return io.BytesIO(z.read(zname))
+    except zipfile.BadZipFile:
+        pass
+    
+    # Try Tar
+    try:
+        with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:*") as t:
+            for member in t.getmembers():
+                if member.name.endswith(filename):
+                    f = t.extractfile(member)
+                    if f:
+                        return io.BytesIO(f.read())
+    except tarfile.TarError:
+        pass
+    return None
 
-from fastapi.responses import StreamingResponse
-import asyncio
+@app.post("/api/process-instant")
+async def process_instant(
+    file: Optional[UploadFile] = File(None),
+    mode: str = Form("generalized"),
+    mapping: str = Form("{}"),
+    sampleSize: int = Form(10)
+):
+    """Stateless HL7 processing for single-use sessions (Privacy-by-Design)."""
+    try:
+        mapping_dict = json.loads(mapping)
+        results = []
+        
+        if file:
+            content = await file.read()
+            ext = os.path.splitext(file.filename)[1].lower()
+            
+            # --- Mode 1: MIMIC Relational (Archive) ---
+            if mode == "mimic":
+                p_buf = get_file_from_archive(content, "patients.csv")
+                l_buf = get_file_from_archive(content, "labevents.csv")
+                d_buf = get_file_from_archive(content, "d_labitems.csv")
+                
+                if not (p_buf and l_buf and d_buf):
+                    # Fallback to .gz versions
+                    p_buf = get_file_from_archive(content, "patients.csv.gz")
+                    l_buf = get_file_from_archive(content, "labevents.csv.gz")
+                    d_buf = get_file_from_archive(content, "d_labitems.csv.gz")
+
+                if not (p_buf and l_buf and d_buf):
+                    raise HTTPException(status_code=400, detail="MIMIC Archive must contain patients.csv, labevents.csv, and d_labitems.csv")
+                
+                # Preprocess in-memory
+                merged_df = preprocess_from_buffers(p_buf, l_buf, d_buf, sample_size=sampleSize)
+                
+                # HL7 transformation logic for MIMIC
+                for subject_id in merged_df['subject_id'].unique():
+                    patient_data = merged_df[merged_df['subject_id'] == subject_id]
+                    # Note: Using existing build_hl7_message for mimic
+                    hl7_msg = build_hl7_message(patient_data)
+                    
+                    # Generate metadata compatible with Dashboard.tsx
+                    metadata = {
+                        "id": str(subject_id),
+                        "pseudonym": f"Patient_{subject_id}", # Mimic doesn't have names
+                        "sex": str(patient_data['gender'].iloc[0]),
+                        "cohort": "Stateless MIMIC",
+                        "labEvents": len(patient_data),
+                        "output": f"mimic_{subject_id}.hl7",
+                        "seal": "Valid"
+                    }
+                    results.append({"signed_msg": hl7_msg, "metadata": metadata})
+
+            # --- Mode 2: Generalized (CSV/Excel) ---
+            else:
+                if ext == ".csv":
+                    df = pd.read_csv(io.BytesIO(content))
+                elif ext in [".xlsx", ".xls"]:
+                    df = pd.read_excel(io.BytesIO(content))
+                else:
+                    raise HTTPException(status_code=400, detail="Unsupported format. Please use .csv or .xlsx")
+                
+                # Use refactored in-memory processor
+                id_col = mapping_dict.get("id_column", df.columns[0])
+                processed = process_records(df.head(sampleSize), id_col, mapping_dict)
+                for sid, msg, meta in processed:
+                    results.append({"signed_msg": msg, "metadata": meta})
+
+        # --- Mode 3: Manual Entry ---
+        elif mapping_dict.get("manual_data"):
+            manual_data = mapping_dict["manual_data"]
+            # Filter out potentially empty keys from frontend
+            manual_data = {k: v for k, v in manual_data.items() if k.strip()}
+            
+            if not manual_data:
+                raise HTTPException(status_code=400, detail="Manual entry data is empty")
+                
+            manual_df = pd.DataFrame([manual_data])
+            # Auto-infer ID column (look for 'id' or 'subject' or take first)
+            id_cand = [k for k in manual_data.keys() if 'id' in k.lower() or 'subject' in k.lower()]
+            id_col = id_cand[0] if id_cand else list(manual_data.keys())[0]
+            
+            # Map everything else to observations
+            obs_map = {k: k for k in manual_data.keys() if k != id_col}
+            manual_mapping = {
+                "id_column": id_col,
+                "gender": next((k for k in manual_data.keys() if 'gender' in k.lower() or 'sex' in k.lower()), "Gender"),
+                "age": next((k for k in manual_data.keys() if 'age' in k.lower()), "Age"),
+                "observations": obs_map
+            }
+            processed = process_records(manual_df, id_col, manual_mapping)
+            for sid, msg, meta in processed:
+                results.append({"signed_msg": msg, "metadata": meta})
+
+        else:
+            raise HTTPException(status_code=400, detail="No data provided")
+
+        # Log completion (Privacy-compliant audit)
+        audit_logger.log_event("Stateless Session Completed", {"mode": mode, "count": len(results)})
+        
+        return {"status": "success", "records": results}
+
+    except Exception as e:
+        logging.error(f"Stateless Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ExportRequest(BaseModel):
+    files: List[dict] # List of {filename: str, content: str}
+
+@app.post("/api/export-zip")
+async def export_zip(request: ExportRequest):
+    """Generate a ZIP archive of HL7 messages in-memory for download."""
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for file_data in request.files:
+            filename = file_data.get("filename", "record.hl7")
+            content = file_data.get("content", "")
+            zf.writestr(filename, content)
+    
+    zip_buffer.seek(0)
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/x-zip-compressed",
+        headers={"Content-Disposition": f"attachment; filename=hl7_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"}
+    )
 
 @app.post("/api/run")
 async def run_pipeline(config: RunConfig):

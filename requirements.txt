@@ -1,1 +1,3 @@
 hl7apy
+pandas
+openpyxl
