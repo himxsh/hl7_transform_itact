@@ -1,0 +1,305 @@
+\documentclass[12pt,a4paper]{report}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{setspace}
+\usepackage{parskip}
+\usepackage{microtype}
+\usepackage{lmodern}
+
+\geometry{
+    top=2.5cm,
+    bottom=2.5cm,
+    left=3cm,
+    right=3cm
+}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    urlcolor=blue,
+    citecolor=blue
+}
+
+% Title formatting
+\titleformat{\section}[block]{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}[block]{\normalsize\bfseries}{\thesubsection}{1em}{}
+
+\begin{document}
+
+%---------------------------------------------------------------------
+% TITLE PAGE
+%---------------------------------------------------------------------
+\begin{titlepage}
+    \centering
+
+    % Logo (top right)
+    \begin{flushright}
+        \includegraphics[width=3cm]{lnmiit_logo.png}
+    \end{flushright}
+
+    \vspace{1.5cm}
+
+    {\large\textbf{Project Report}}
+
+    \vspace{0.3cm}
+    \noindent\rule{\textwidth}{0.4pt}
+    \vspace{0.5cm}
+
+    {\LARGE\textbf{Secure Legal-Compliant HL7\\[0.3em] Orchestration Pipeline}}
+
+    \vspace{0.4cm}
+
+    {\large\textbf{using MIMIC-IV Clinical Data and\\Cryptographic Validation}}
+
+    \vspace{1.2cm}
+    \noindent\rule{\textwidth}{0.4pt}
+    \vspace{0.8cm}
+
+    {\normalsize\textbf{Course Instructor:} Dr. Abhishek Sharma}
+
+    \vspace{0.2cm}
+    {\normalsize IT Act and Data Protection (ITADP)}
+
+    \vspace{0.8cm}
+
+    {\normalsize\textbf{Author:} Himesh Jain (23UEC549)}
+
+    \vspace{0.2cm}
+    {\small\textcolor{blue}{\url{github.com/himxsh}}}
+
+    \vfill
+
+    {\normalsize\textbf{Date:} March 31, 2026}
+
+    \vspace{0.4cm}
+    {\small Copyright \textcopyright\ The LNMIIT 2026\\All rights reserved.}
+\end{titlepage}
+
+%---------------------------------------------------------------------
+% TABLE OF CONTENTS
+%---------------------------------------------------------------------
+\setcounter{tocdepth}{2}
+\renewcommand{\contentsname}{Contents}
+
+% List of Figures and Tables entries manually listed before TOC
+\tableofcontents
+
+\newpage
+
+%---------------------------------------------------------------------
+% LIST OF FIGURES
+%---------------------------------------------------------------------
+\section*{List of Figures}
+\addcontentsline{toc}{section}{List of Figures}
+\begin{enumerate}
+    \item System Architecture (Figure 1)
+    \item Frontend Dashboard Interaction Flow (Figure 2)
+\end{enumerate}
+
+%---------------------------------------------------------------------
+% LIST OF TABLES
+%---------------------------------------------------------------------
+\section*{List of Tables}
+\addcontentsline{toc}{section}{List of Tables}
+\begin{enumerate}
+    \item SWAT Analysis of the Pipeline (Table 1)
+    \item Control-to-Legal Mapping (Table 2)
+\end{enumerate}
+
+\newpage
+
+%---------------------------------------------------------------------
+% ABSTRACT
+%---------------------------------------------------------------------
+\begin{center}
+    \textbf{Abstract}
+\end{center}
+
+This report presents a secure, legal-compliant orchestration pipeline for Health Level Seven (HL7) messages, specifically addressing data ingestion from the MIMIC-IV clinical dataset. The system combines data transformation (using the \texttt{hl7\_transform} library) with rigorous legal and governance controls mandated by the Indian IT Act 2000 and the Digital Personal Data Protection (DPDP) Act 2023. Key contributions include memory-efficient chunked ingestion of MIMIC-IV data, deterministic pseudonymization via a seeded Faker engine for privacy preservation, and cryptographic SHA-256 message signing via custom ZSH segments for tamper-evident data integrity. The resulting pipeline is visualized and monitored through an interactive React dashboard, demonstrating end-to-end auditable, compliance-aware clinical data processing.
+
+\newpage
+
+%---------------------------------------------------------------------
+% SECTION 1: INTRODUCTION
+%---------------------------------------------------------------------
+\setcounter{section}{0}
+\renewcommand{\thesection}{\arabic{section}}
+\section{Introduction}
+
+Healthcare interoperability heavily relies on the HL7 standard for exchanging medical information. However, integrating massive clinical datasets like MIMIC-IV into modern research environments while strictly adhering to data protection laws requires a specialized architecture.
+
+\subsection*{Problem Statement}
+
+Clinical data contains highly sensitive Personally Identifiable Information (PII) and Protected Health Information (PHI). When utilizing datasets like MIMIC-IV or transmitting live hospital data, organizations must protect patient privacy without destroying data utility. Furthermore, they must ensure data has not been tampered with during rest or transit. The core challenge is building an orchestration pipeline that translates raw CSV or generic HL7 feeds into standardized, privacy-scrubbed, and cryptographically verifiable HL7 messages.
+
+\subsection*{Novelty and Contribution}
+
+\begin{itemize}
+    \item \textbf{High-Efficiency Ingestion}: A memory-efficient, chunked processing engine tailored for MIMIC-IV, capable of mapping structured CSV data into valid HL7 `ORU\string^R01` messages without memory faults.
+    \item \textbf{DPDP-Aligned Privacy Engine}: A deterministic anonymizer utilizing a seeded \texttt{Faker} instance. This ensures that a patient named ``John Doe'' is consistently masked to the same pseudonymous identity across multiple records, retaining relational utility while fully scrubbing real PII.
+    \item \textbf{IT Act 2000 Integrity Protocol}: Security seals are generated using cryptographic hashing (SHA-256) of the HL7 message payload and appended as a custom \texttt{ZSH} segment. A standalone verifier script allows auditing of these seals post-hoc.
+    \item \textbf{Interactive Dashboard}: A React-based front-end that provides researchers and compliance officers with real-time views into data lineage, security metrics, and compliance adherence.
+\end{itemize}
+
+\subsection*{SWAT Analysis}
+
+\begin{table}[H]
+\centering
+\caption{SWAT Analysis of the Pipeline}
+\begin{tabular}{>{\bfseries}p{2.5cm} p{10cm}}
+\toprule
+Dimension & Project-Specific Analysis \\
+\midrule
+Strengths & Robust, standardized HL7 conversion; deep integration with Indian IT law and DPDP Act; deterministic relational consistency in anonymization. \\[0.5em]
+Weaknesses & Dependent on the structure of MIMIC-IV specifically; custom ZSH segments may require parser updates in legacy receiving systems. \\[0.5em]
+Opportunities & High relevance for Indian healthcare startups needing compliance-out-of-the-box; extensible to FHIR standards. \\[0.5em]
+Threats & Evolving encryption standards may require SHA-256 to be upgraded; strict DPDP enforcement may alter consent tracking requirements. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%---------------------------------------------------------------------
+% SECTION 2: METHODOLOGY
+%---------------------------------------------------------------------
+\section{Methodology}
+
+The system architecture is compartmentalized into data ingestion, orchestration, privacy transformation, and security validation.
+
+\subsection{Data Ingestion (MIMIC-IV)}
+
+The pipeline processes massive CSV files (e.g., \texttt{patients.csv}, \texttt{admissions.csv}, \texttt{labevents.csv}) using the \texttt{pandas} library. To avoid memory limitations, data is consumed in predefined chunks. Relational consistency is maintained by merging these files on \texttt{subject\_id} before generating the baseline HL7 strings.
+
+\subsection{Privacy Preservation (Anonymizer)}
+
+The \texttt{Anonymizer} class is responsible for DPDP compliance.
+\begin{equation}
+    \text{Pseudonym}(P_i) = \text{Faker}(\text{seed} = P_i.\text{subject\_id})
+\end{equation}
+By seeding the random generator with the unique patient ID, the system ensures that multiple lab events for the same patient are mapped to the same fake name, address, and demographic profile, preserving longitudinal data utility. Additionally, regex and checksum validations catch edge-case PII leaks.
+
+\subsection{Security and Integrity (IT Act)}
+
+Under the IT Act 2000, Section 43A (Reasonable Security Practices) and Section 72A (Breach of Confidentiality), the pipeline enforces data integrity. 
+\begin{equation}
+    \text{Hash}_{msg} = \text{SHA-256}(\text{HL7\_Payload}_{\text{canonical}})
+\end{equation}
+This hash is packaged into a custom segment:
+\texttt{ZSH|1|SHA-256|[HASH\_LITERAL]}
+The \texttt{IntegrityManager} appends this to the trailing end of the HL7 message. Any modification to the preceding segments renders the hash invalid through the \texttt{validate\_integrity.py} script.
+
+\subsection{Figures}
+
+\begin{figure}[H]
+    \centering
+    % System Architecture diagram placeholder
+    \fbox{\parbox{0.85\textwidth}{\centering\vspace{4cm}
+    [SYSTEM ARCHITECTURE DIAGRAM PLACEHOLDER]\\[0.5em]
+    \small
+    (Illustrates: Raw MIMIC-IV CSVs $\rightarrow$ Preprocessing Engine $\rightarrow$ HL7 Orchestrator $\leftrightarrow$ Anonymizer (DPDP) $\leftrightarrow$ Integrity Manager (IT Act) $\rightarrow$ Secure HL7 Output $\rightarrow$ React Dashboard \& Validators)
+    \vspace{4cm}}}
+    \caption{HL7 Orchestration System Architecture}
+    \label{fig:system_arch}
+\end{figure}
+
+%---------------------------------------------------------------------
+% SECTION 3: OPERATIONAL WORKING
+%---------------------------------------------------------------------
+\section{Operational Working}
+
+The end-to-end execution of the pipeline can be monitored and validated through both backend scripts and a frontend React dashboard.
+
+\subsection{Execution Flow}
+
+\begin{enumerate}
+    \item \textbf{Initialization}: The user launches the orchestrator via \texttt{main.py} or the frontend UI.
+    \item \textbf{Data Selection}: The pipeline routes to either a generic HL7 transformation module or the custom MIMIC-IV chunked processor.
+    \item \textbf{Anonymization}: The \texttt{Anonymizer} scrubs patient identifier segments dynamically.
+    \item \textbf{Sealing}: The \texttt{IntegrityManager} computes the cryptographic hash and appends the \texttt{ZSH} segment.
+    \item \textbf{Output}: Processed messages are written to disk.
+    \item \textbf{Validation}: The \texttt{validate\_integrity.py} script is run to re-hash the message body and compare it with the \texttt{ZSH} seal, guaranteeing zero tampering occurred post-processing.
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    % Dashboard UI diagram placeholder
+    \fbox{\parbox{0.85\textwidth}{\centering\vspace{4cm}
+    [DASHBOARD UI WORKFLOW PLACEHOLDER]\\[0.5em]
+    \small
+    (Shows the React component flow: Database Selection $\rightarrow$ Real-time Transformation Tracking $\rightarrow$ Security Analysis Modal)
+    \vspace{4cm}}}
+    \caption{Frontend Dashboard Interaction Flow}
+    \label{fig:dashboard_flow}
+\end{figure}
+
+%---------------------------------------------------------------------
+% SECTION 4: GOVERNANCE AND COMPLIANCE
+%---------------------------------------------------------------------
+\section{Governance and Compliance Outcomes}
+
+The system successfully maps technical controls to Indian legislative requirements.
+
+\begin{table}[H]
+\centering
+\caption{Control-to-Legal Mapping}
+\begin{tabular}{p{4.5cm} p{5.5cm} p{4cm}}
+\toprule
+Technical Control & Implementation Evidence & Legal Mapping \\
+\midrule
+Deterministic Pseudonymization & Seeded \texttt{Faker} instances dynamically replacing PHI & DPDP Act (Data Minimization \& Protection) \\[0.4em]
+Cryptographic Hashing & Custom \texttt{ZSH} Segment appended to HL7 messages & IT Act 2000 (Tamper-Evidence) \\[0.4em]
+Integrity Validation Tests & Independent \texttt{validate\_integrity.py} script & IT Act Sec. 43A (Reasonable Security Practices) \\[0.4em]
+Dashboard Monitoring & React frontend surfacing metrics & SPDI Rules 2011 (Transparency) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%---------------------------------------------------------------------
+% SECTION 5: CONCLUSION
+%---------------------------------------------------------------------
+\section{Conclusion}
+
+This project successfully demonstrates the fusion of complex healthcare data standards (HL7) with strict legal compliance frameworks (DPDP and IT Act). By wrapping the core \texttt{hl7\_transform} library with novel preprocessing for MIMIC-IV, deterministic anonymization, and cryptographic integrity sealing, the resulting orchestration pipeline is a comprehensive, scalable solution. The addition of the React dashboard ensures that complex privacy and security operations are transparent, auditable, and ready for deployment in highly regulated clinical environments.
+
+%---------------------------------------------------------------------
+% REFERENCES
+%---------------------------------------------------------------------
+\newpage
+\renewcommand{\bibname}{References}
+\begin{thebibliography}{11}
+
+\bibitem{hl7}
+HL7 International, ``Health Level Seven (HL7) Standards,'' \url{http://www.hl7.org/}.
+
+\bibitem{mimic4}
+A. E. W. Johnson et al., ``MIMIC-IV, a freely accessible electronic health record dataset,'' \textit{Scientific Data}, 2023.
+
+\bibitem{itact}
+Government of India, \textit{Information Technology Act, 2000} (as amended), Sections 43A, and 72A.
+
+\bibitem{dpdp}
+Government of India, \textit{Digital Personal Data Protection Act, 2023}.
+
+\bibitem{python_hl7}
+Python \texttt{hl7apy} library documentation, \url{https://hl7apy.org}.
+\end{thebibliography}
+
+\end{document}
