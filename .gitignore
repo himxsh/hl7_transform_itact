@@ -177,3 +177,5 @@ flow.pen
 *.toc
 *.log
 *.synctex.gz
+*.lof
+*.lot

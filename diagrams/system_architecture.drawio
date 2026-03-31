@@ -1,0 +1,117 @@
+<mxfile host="65bd71144e">
+    <diagram name="System Architecture" id="arch">
+        <mxGraphModel dx="848" dy="1058" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="800" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="HL7 Orchestration Pipeline — System Architecture" style="text;html=0;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;fontSize=20;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="420" y="20" width="520" height="35" as="geometry"/>
+                </mxCell>
+                <mxCell id="grp_data" value="Data Sources (MIMIC-IV)" style="swimlane;startSize=28;fillColor=#dae8fc;strokeColor=#6c8ebf;rounded=1;fontSize=13;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="90" width="210" height="280" as="geometry"/>
+                </mxCell>
+                <mxCell id="csv1" value="patients.csv.gz&#10;(Demographics)" style="shape=document;whiteSpace=wrap;html=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="grp_data" vertex="1">
+                    <mxGeometry x="30" y="40" width="150" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="csv2" value="labevents.csv.gz&#10;(2.4+ GB Observations)" style="shape=document;whiteSpace=wrap;html=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="grp_data" vertex="1">
+                    <mxGeometry x="30" y="110" width="150" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="csv3" value="d_labitems.csv.gz&#10;(Lab Dictionary)" style="shape=document;whiteSpace=wrap;html=0;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="grp_data" vertex="1">
+                    <mxGeometry x="30" y="180" width="150" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="preprocess" value="Preprocessing Engine&#10;preprocess_mimic.py&#10;━━━━━━━━━━━━━━━&#10;• Chunked streaming (100K rows)&#10;• Column minimization&#10;• Multi-table JOIN&#10;• Patient sampling (N=50)" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="90" width="230" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="orchestrator" value="Orchestrator — main.py&#10;━━━━━━━━━━━━━━━&#10;• CLI entry point&#10;• Routes: MIMIC / Generic&#10;• Pipeline coordination" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="270" width="230" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="hl7map" value="HL7 Mapping Engine&#10;hl7_transform library&#10;━━━━━━━━━━━━━━━&#10;• Rule-based field mapping&#10;• ORU^R01 construction&#10;• MSH/PID/OBR/OBX/NTE&#10;  segment generation" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="90" width="230" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="anon" value="Anonymizer (DPDP Act)&#10;anonymizer.py&#10;━━━━━━━━━━━━━━━&#10;• Seeded Faker (en_IN)&#10;• PID pseudonymization&#10;• Regex PII scrubbing&#10;• Aadhaar/PAN/Email/Phone" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="260" width="230" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="integrity" value="IntegrityManager (IT Act)&#10;integrity.py&#10;━━━━━━━━━━━━━━━&#10;• SHA-256 payload hashing&#10;• ZSH Z-segment generation&#10;• Stateless sign / verify&#10;• ISO 8601 timestamping" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="430" width="230" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="output" value="Signed HL7 Output&#10;output/*.hl7&#10;━━━━━━━━━━━━━━━&#10;Privacy-scrubbed +&#10;Cryptographically sealed" style="shape=cylinder3;whiteSpace=wrap;html=0;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;size=15;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="930" y="90" width="190" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="validator" value="Integrity Auditor&#10;validate_integrity.py&#10;━━━━━━━━━━━━━━━&#10;• Strip ZSH segment&#10;• Re-hash payload&#10;• Compare digests&#10;• PASS / FAIL report" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="930" y="270" width="190" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="dashboard" value="React Dashboard&#10;frontend/src/*.tsx&#10;━━━━━━━━━━━━━━━&#10;• SSE live streaming&#10;• Security analytics&#10;• Data lineage view&#10;• Compliance status&#10;• Audit log" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=left;spacingLeft=10;" parent="1" vertex="1">
+                    <mxGeometry x="930" y="440" width="190" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="fastapi" value="FastAPI Server — app.py&#10;(SSE Endpoints)" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="1200" y="520" width="180" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="a1" style="rounded=1;strokeWidth=2;strokeColor=#333333;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="grp_data" target="preprocess" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a2" style="rounded=1;strokeWidth=2;strokeColor=#333333;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="preprocess" target="orchestrator" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a3" style="rounded=1;strokeWidth=2;strokeColor=#333333;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="orchestrator" target="hl7map" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="590" y="325"/>
+                            <mxPoint x="590" y="155"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a4" style="rounded=1;strokeWidth=2;strokeColor=#d6b656;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="hl7map" target="anon" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a5" style="rounded=1;strokeWidth=2;strokeColor=#d6b656;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="anon" target="integrity" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a6" style="rounded=1;strokeWidth=2;strokeColor=#82b366;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="integrity" target="output" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="890" y="495"/>
+                            <mxPoint x="890" y="155"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a7" style="rounded=1;strokeWidth=2;strokeColor=#b85450;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="output" target="validator" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a7l" value="Post-hoc audit" style="edgeLabel;html=0;align=center;verticalAlign=middle;resizable=0;fontSize=10;fontColor=#b85450;fontStyle=2;" connectable="0" vertex="1" parent="a7">
+                    <mxGeometry x="0.1" relative="1" as="geometry">
+                        <mxPoint x="55" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a8" style="rounded=1;strokeWidth=2;strokeColor=#9673a6;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="validator" target="dashboard" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="a8l" value="Results feed" style="edgeLabel;html=0;align=center;verticalAlign=middle;resizable=0;fontSize=10;fontColor=#9673a6;fontStyle=2;" connectable="0" vertex="1" parent="a8">
+                    <mxGeometry x="0.1" relative="1" as="geometry">
+                        <mxPoint x="50" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="a9" style="rounded=1;strokeWidth=2;strokeColor=#d6b656;exitX=1.008;exitY=0.72;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitPerimeter=0;" parent="1" source="dashboard" target="fastapi" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="leg_bg" value="" style="rounded=1;whiteSpace=wrap;html=0;fillColor=#f5f5f5;strokeColor=#cccccc;" vertex="1" parent="1">
+                    <mxGeometry x="1200" y="90" width="180" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="leg_title" value="Legend" style="text;html=0;fontSize=14;fontStyle=1;align=center;" parent="1" vertex="1">
+                    <mxGeometry x="1255" y="95" width="60" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="leg1" value="Novel Addition" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="1215" y="125" width="150" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="leg2" value="Original Library" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="1215" y="155" width="150" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="leg3" value="Data Sources" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="1215" y="185" width="150" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="leg4" value="Output / Storage" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="1215" y="215" width="150" height="25" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
