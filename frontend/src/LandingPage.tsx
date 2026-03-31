@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ShieldCheck, BookOpen, Scale, Shield, Heart, Globe } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 import { useState, useEffect } from 'react';
 
 export default function LandingPage() {
@@ -99,9 +100,9 @@ export default function LandingPage() {
               className="relative w-full aspect-[3/4] overflow-hidden grayscale contrast-125 border border-gold/10"
             >
               <img
-                alt="Abstract medical glass architecture"
+                alt="Medical data security and analysis"
                 className="object-cover w-full h-full opacity-80"
-                src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&q=80&w=1000"
+                src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=1000"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute inset-0 bg-gold/10 mix-blend-multiply"></div>
@@ -284,27 +285,7 @@ export default function LandingPage() {
 
       </main>
 
-      {/* Footer */}
-      <footer className="bg-charcoal text-white pt-15 pb-15 border-t border-white/5">
-        <div className="max-w-[1440px] mx-auto px-6 lg:px-12">
-          <div className="grid lg:grid-cols-12 gap-16">
-            <div className="lg:col-span-5">
-              <span className="font-title text-3xl font-light uppercase tracking-tighter mb-6 block">
-                HL7 <span className="italic lowercase font-title">Orchestrator</span>
-              </span>
-              <p className="font-sans text-slate-400 max-w-sm mb-10 leading-relaxed">
-                This project was developed as an exhibition for the IT Act and Data Protection for the ITADP course under the guidance of Dr. Abhishek Sharma (LNMIIT). This project is not intended for commercial purposes.
-              </p>
-            </div>
-            <div className="lg:col-span-7 flex justify-end">
-              <div className="grid grid-cols-2 gap-12 lg:gap-24">
-                <FooterColumn title="Original Repo" items={['HL7_transform']} />
-                <FooterColumn title="Contact" items={['Email', 'Linkedin', 'Github']} />
-              </div>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }
@@ -315,16 +296,5 @@ const PipelineCard = ({ phase, title, desc, isLast = false }: { phase: string, t
     <span className="font-mono text-[15px] text-gold block mb-8">PHASE {phase}</span>
     <h3 className="font-title text-2xl font-light mb-4 tracking-tight uppercase">{title}</h3>
     <p className="font-sans text-sm text-slate-500 leading-relaxed">{desc}</p>
-  </div>
-);
-
-const FooterColumn = ({ title, items }: { title: string, items: string[] }) => (
-  <div className="space-y-4">
-    <span className="font-mono text-[10px] uppercase tracking-widest text-gold">{title}</span>
-    <nav className="flex flex-col gap-2 font-sans text-sm text-slate-400">
-      {items.map(item => (
-        <a key={item} className="hover:text-white transition-colors" href="#">{item}</a>
-      ))}
-    </nav>
   </div>
 );

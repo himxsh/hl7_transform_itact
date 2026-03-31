@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Lock, Clock, ShieldCheck, BarChart3, RefreshCw } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 import { useState, useEffect } from 'react';
 
 interface AlgoResult {
@@ -231,11 +232,12 @@ export const EncryptionComparisonContent = ({ isModal = false }: { isModal?: boo
 
 export default function EncryptionComparison() {
   return (
-    <div className="min-h-screen bg-bg-light text-neutral-dark font-sans selection:bg-primary-gold/30">
+    <div className="min-h-screen flex flex-col bg-bg-light text-neutral-dark font-sans selection:bg-primary-gold/30">
       <Header activeTab="encryption" />
-      <main className="max-w-[1200px] mx-auto px-6 py-24">
+      <main className="max-w-[1200px] flex-1 mx-auto px-6 py-24 w-full">
         <EncryptionComparisonContent />
       </main>
+      <Footer />
     </div>
   );
 }
