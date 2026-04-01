@@ -64,13 +64,11 @@ const LogEntry: React.FC<LogEntryProps> = ({ time, file, status, warning = false
   <motion.div
     initial={{ opacity: 0, x: -10 }}
     animate={{ opacity: 1, x: 0 }}
-    className="flex items-center justify-between border-b border-ui-border/10 pb-2.5"
+    className="grid grid-cols-12 gap-2 border-b border-ui-border/10 pb-2.5 items-center"
   >
-    <div className="flex space-x-3">
-      <span className="text-white/30 font-mono">[{time}]</span>
-      <span className="text-white/70">{file}</span>
-    </div>
-    <div className="flex items-center space-x-2">
+    <div className="col-span-3 text-white/30 font-mono">[{time}]</div>
+    <div className="col-span-6 text-white/70 truncate">{file}</div>
+    <div className="col-span-3 flex items-center justify-end space-x-2">
       <span className={warning ? 'text-warn-amber' : 'text-ok-green'}>{status}</span>
       <div className={`w-1 h-1 rounded-full ${warning ? 'bg-warn-amber' : 'bg-ok-green'} animate-pulse`} />
     </div>
@@ -234,7 +232,7 @@ export default function Dashboard() {
             setValidationLogs(prev => [
               ...prev,
               {
-                time: new Date().toLocaleTimeString([], { hour12: false }),
+                time: new Date().toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false }) + ' IST',
                 file: data.record.output,
                 status: 'PASS'
               }
@@ -467,11 +465,16 @@ export default function Dashboard() {
               <section className="glass-panel p-6">
                 <div className="flex items-center space-x-2 mb-5">
                   <ShieldAlert size={14} className="text-gold" />
-                  <h3 className="text-gold uppercase tracking-[0.2em] text-[11px]">Integrity Validation Log</h3>
+                  <h3 className="text-gold uppercase tracking-[0.2em] text-[11px]">Integrity Validation Log (IST)</h3>
+                </div>
+                <div className="grid grid-cols-12 gap-2 mb-2 px-1 text-white/20 font-mono text-[7px] uppercase tracking-widest border-b border-white/5 pb-1">
+                  <div className="col-span-3">Time</div>
+                  <div className="col-span-6 text-center">Record File</div>
+                  <div className="col-span-3 text-right">Status</div>
                 </div>
                 <div 
                   ref={logContainerRef}
-                  className="space-y-4 technical-data text-[10px] h-[260px] overflow-y-auto pr-2 scrollbar-hide flex flex-col"
+                  className="space-y-4 technical-data text-[10px] h-[260px] overflow-y-auto pr-2 custom-scroll flex flex-col"
                 >
                   <AnimatePresence initial={false}>
                     {validationLogs.map((log, i) => (

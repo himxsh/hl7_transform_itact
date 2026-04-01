@@ -120,7 +120,7 @@ export default function SecurityModal({ isOpen, onClose }: { isOpen: boolean, on
         {/* Footer */}
         <div className="shrink-0 px-8 py-4 border-t border-primary-gold/10 bg-white/50 flex justify-between items-center text-[9px] font-mono text-neutral-dark/60 uppercase tracking-[0.1em]">
           <div>Legal Basis: IT Act 2000, DPDP Act 2023, GDPR Article 32</div>
-          <div>Secure Orchestration v0.0.1 · Last Assessed: {new Date().toLocaleDateString()}</div>
+          <div>Secure Orchestration v0.0.1 · Last Assessed: {new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short' })} {new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false })} IST</div>
         </div>
       </motion.div>
     </div>

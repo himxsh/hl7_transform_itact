@@ -128,23 +128,46 @@ export const AuditLogContent = ({ isModal = false }: { isModal?: boolean }) => {
       </div>
 
       <div className={`border border-primary-gold/10 bg-white ${isModal ? 'max-h-[400px]' : ''} overflow-y-auto custom-scroll`}>
-        {entries.length > 0 ? entries.map((entry, idx) => (
-          <div key={idx} className="p-4 border-b border-primary-gold/5 flex items-start gap-4 text-xs">
-            <span className="text-lg shrink-0">{eventIcons[entry.event_type] || '📋'}</span>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="font-mono font-bold text-neutral-dark">{entry.event_type.replace(/_/g, ' ')}</span>
-                <span className={`font-mono text-[8px] px-1.5 py-0.5 border rounded-sm ${severityColors[entry.severity] || ''}`}>{entry.severity}</span>
-                {entry.subject_id && <span className="font-mono text-[8px] text-primary-gold bg-primary-gold/10 px-1.5 py-0.5">ID: {entry.subject_id}</span>}
-              </div>
-              <div className="text-neutral-dark/60 text-[10px] mb-1">{entry.legal_reference}</div>
-              <div className="font-mono text-[9px] text-neutral-dark/30 truncate">
-                {JSON.stringify(entry.details)}
-              </div>
-            </div>
-            <div className="text-[9px] text-neutral-dark/30 font-mono shrink-0">{entry.timestamp?.slice(11, 19)}</div>
-          </div>
-        )) : (
+        {entries.length > 0 ? (
+          <table className="w-full text-left border-collapse">
+            <thead className="sticky top-0 bg-white z-10 shadow-sm border-b border-primary-gold/10">
+              <tr className="text-[10px] uppercase tracking-[0.1em] text-primary-gold/70 font-mono bg-primary-gold/5">
+                <th className="px-4 py-3 font-bold whitespace-nowrap">Event Action</th>
+                <th className="px-4 py-3 font-bold whitespace-nowrap">Severity & ID</th>
+                <th className="px-4 py-3 font-bold flex-1">Legal Basis</th>
+                <th className="px-4 py-3 font-bold max-w-[200px]">Details</th>
+                <th className="px-4 py-3 font-bold whitespace-nowrap text-right">Timestamp (IST)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-primary-gold/5">
+              {entries.map((entry, idx) => (
+                <tr key={idx} className="hover:bg-primary-gold/[0.02] transition-colors">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-lg shrink-0">{eventIcons[entry.event_type] || '📋'}</span>
+                      <span className="font-mono font-bold text-neutral-dark text-xs">{entry.event_type.replace(/_/g, ' ')}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`font-mono text-[8px] px-1.5 py-0.5 border rounded-sm ${severityColors[entry.severity] || ''}`}>{entry.severity}</span>
+                      {entry.subject_id && <span className="font-mono text-[8px] text-primary-gold bg-primary-gold/10 px-1.5 py-0.5 whitespace-nowrap">ID: {entry.subject_id}</span>}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-neutral-dark/60 text-[10px] leading-tight">
+                    {entry.legal_reference}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-[9px] text-neutral-dark/40 max-w-[200px] truncate" title={JSON.stringify(entry.details)}>
+                    {JSON.stringify(entry.details)}
+                  </td>
+                  <td className="px-4 py-3 text-[9px] text-neutral-dark/40 font-mono text-right whitespace-nowrap">
+                    {new Date(entry.timestamp).toLocaleTimeString('en-US', { timeZone: 'Asia/Kolkata', hour12: false })} IST
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
           <div className="p-10 text-center">
             <Clock size={32} className="text-primary-gold mx-auto mb-4 opacity-20" />
             <p className="font-sans text-neutral-dark/40 text-xs text-center">No logs found.</p>

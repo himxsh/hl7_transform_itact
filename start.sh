@@ -1,20 +1,30 @@
 #!/bin/bash
 
-echo "Starting Backend (Uvicorn) using venv..."
-./venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 &
-BACKEND_PID=$!
+if [ "$NODE_ENV" = "production" ]; then
+    echo "Starting in PRODUCTION mode..."
+    echo "Serving frontend from frontend/dist/ via FastAPI"
+    uvicorn app:app --host 0.0.0.0 --port 8000
+else
+    echo "Starting in DEVELOPMENT mode..."
 
-# Wait a bit for backend to initialize
-sleep 2
+    echo "Starting Backend (Uvicorn)..."
+    if [ -d "venv" ]; then
+        ./venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000 --reload &
+    else
+        uvicorn app:app --host 0.0.0.0 --port 8000 --reload &
+    fi
+    BACKEND_PID=$!
 
-echo "Starting Frontend (Vite)..."
-cd frontend && npm run dev &
-FRONTEND_PID=$!
+    sleep 2
 
-echo "Systems active:"
-echo "- Backend: http://localhost:8000"
-echo "- Frontend: http://localhost:3000"
+    echo "Starting Frontend (Vite)..."
+    cd frontend && npm run dev &
+    FRONTEND_PID=$!
 
-# Wait for both processes
-trap "kill $BACKEND_PID $FRONTEND_PID" EXIT
-wait
+    echo "Systems active:"
+    echo "- Backend: http://localhost:8000"
+    echo "- Frontend: http://localhost:3000"
+
+    trap "kill $BACKEND_PID $FRONTEND_PID" EXIT
+    wait
+fi

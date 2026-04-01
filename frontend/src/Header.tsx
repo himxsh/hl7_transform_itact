@@ -37,7 +37,6 @@ export default function Header({ activeTab }: HeaderProps) {
     { id: 'home', label: 'Home', path: '/' },
     { id: 'pipeline', label: 'Pipeline', path: '/selection' },
     { id: 'architecture', label: 'Architecture', path: '/architecture' },
-    { id: 'encryption', label: 'Encryption', path: '/encryption' },
     { id: 'compliance', label: 'Compliance', path: '/compliance' },
   ];
 

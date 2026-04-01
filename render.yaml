@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: hl7-pipeline
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: CORS_ORIGINS
+        value: https://hl7-pipeline.onrender.com
+      - key: MAX_UPLOAD_MB
+        value: "5"
