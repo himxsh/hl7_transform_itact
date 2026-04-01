@@ -1,13 +1,18 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Header as FastAPIHeader
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict
 import os
 import uuid
+import shutil
+import tempfile
 import logging
+import time
+import threading
 from pathlib import Path
-from pipelines.mimic_pipeline import run_mimic_pipeline, build_hl7_message
+from pipelines.mimic_pipeline import build_hl7_message
 from pipelines.generic_pipeline import run_generic_pipeline
 from hl7_transform.anonymizer import Anonymizer
 from hl7_transform.integrity import IntegrityManager
@@ -29,44 +34,68 @@ import zipfile
 app = FastAPI()
 logger = logging.getLogger("hl7_pipeline.app")
 
+# ---------------------------------------------------------------------------
+# Configuration from environment
+# ---------------------------------------------------------------------------
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_MB", "5")) * 1024 * 1024  # 5MB default
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+_ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", None)
+
+# Stateless working directory (created per-run, cleaned after)
+TEMP_ROOT = Path("temp")
+TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+
 # Enable CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-DATA_DIR = "dataset"
-OUT_DIR = "output"
-UPLOAD_DIR = "uploads"
-
-# Ensure directories exist
-Path(OUT_DIR).mkdir(parents=True, exist_ok=True)
-Path(UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
-
-# Shared instances
+# Shared compliance module instances (stateless — no patient data stored)
 audit_logger = AuditLogger()
 encryption_comparator = EncryptionComparator()
-breach_detector = BreachDetector(output_dir=OUT_DIR)
 compliance_scorer = ComplianceScorer()
 data_lineage = DataLineageTracker()
 risk_assessor = RiskAssessor()
 access_control = AccessControlSimulator()
 
-# Cache for encryption comparison results, keyed by run_id to avoid race conditions
-_encryption_results_store: dict = {}
-_run_output_store: dict = {}
-_latest_run_id: Optional[str] = None
+# ---------------------------------------------------------------------------
+# Short-lived download store (token → ZIP bytes, auto-expire after 15 min)
+# ---------------------------------------------------------------------------
+_download_store: Dict[str, dict] = {}  # token → {"data": bytes, "created": float}
+_DOWNLOAD_TTL_SECONDS = 15 * 60
 
-# Admin token for destructive operations (loaded from env)
-_ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", None)
+def _cleanup_expired_downloads():
+    """Remove expired download tokens."""
+    now = time.time()
+    expired = [k for k, v in _download_store.items() if now - v["created"] > _DOWNLOAD_TTL_SECONDS]
+    for k in expired:
+        del _download_store[k]
 
+
+# ---------------------------------------------------------------------------
+# Short-lived encryption store (holds latest run for the demo UI)
+# ---------------------------------------------------------------------------
+_latest_encryption_results = []
+
+
+# ---------------------------------------------------------------------------
+# Request/Response Models
+# ---------------------------------------------------------------------------
 class RunConfig(BaseModel):
     dataset: str
-    sampleSize: int
-    filePath: Optional[str] = None
+    runId: str  # UUID of the temp dir where files were uploaded
+    filePath: Optional[str] = None  # For backward compat with generic mode
+
+
+class SinglePatientRequest(BaseModel):
+    """Request body for single-patient HL7 generation."""
+    fields: dict  # e.g. {"gender": "M", "age": "45", ...}
+    observations: list  # e.g. [{"header": "BIL-TOT", "value": "1.2"}, ...]
+
 
 class Record(BaseModel):
     id: str
@@ -77,6 +106,19 @@ class Record(BaseModel):
     output: str
     seal: str
 
+
+# ---------------------------------------------------------------------------
+# Health Check
+# ---------------------------------------------------------------------------
+@app.get("/api/health")
+async def health():
+    """Readiness probe for deployment platforms."""
+    return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+# ---------------------------------------------------------------------------
+# Dataset Info (kept for landing page)
+# ---------------------------------------------------------------------------
 @app.get("/api/datasets")
 async def get_datasets():
     return [
@@ -84,25 +126,125 @@ async def get_datasets():
         {"id": "liver", "name": "Indian Liver Patient", "description": "Generic medical CSV workload"}
     ]
 
-from fastapi.responses import StreamingResponse
+
+# ---------------------------------------------------------------------------
+# File Upload — Stateless (saved to temp/{uuid}/)
+# ---------------------------------------------------------------------------
 import asyncio
 
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...)):
+    """Upload a file for processing. Files are saved to a temp directory and
+    deleted after processing completes. Max 5MB per file.
+
+    [DPDP Act §8(1)] — Data collected only for declared processing purpose.
+    """
+    # Read contents and enforce size limit
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)}MB limit. "
+                   f"Please upload a smaller file."
+        )
+
+    # Sanitize filename
+    safe_name = Path(file.filename).name
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    # Enforce allowed extensions
+    allowed_extensions = {".csv", ".gz"}
+    file_ext = Path(safe_name).suffix.lower()
+    # .csv.gz has suffix .gz which is allowed
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type '{file_ext}' not allowed. Only CSV and CSV.GZ files are accepted."
+        )
+
+    # Check for existing runId in form data or create new one
+    # We use a query param approach: frontend sends runId if it already has one
+    run_id = str(uuid.uuid4())
+    run_dir = TEMP_ROOT / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    file_path = run_dir / safe_name
+    file_path.write_bytes(contents)
+
+    audit_logger.log(
+        event_type="FILE_UPLOADED",
+        details={"filename": safe_name, "size_bytes": len(contents), "run_id": run_id},
+        legal_reference="DPDP §8(1) (Data collection for processing)",
+        severity="INFO",
+    )
+
+    return {"filename": safe_name, "path": str(file_path), "runId": run_id}
+
+
+@app.post("/api/upload/{run_id}")
+async def upload_file_to_run(run_id: str, file: UploadFile = File(...)):
+    """Upload additional files to an existing run directory (for MIMIC 3-file upload).
+
+    [DPDP Act §8(1)] — Data collected only for declared processing purpose.
+    """
+    contents = await file.read()
+    if len(contents) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {MAX_UPLOAD_BYTES // (1024 * 1024)}MB limit."
+        )
+
+    safe_name = Path(file.filename).name
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    run_dir = TEMP_ROOT / run_id
+    if not run_dir.exists():
+        raise HTTPException(status_code=404, detail="Run ID not found. Upload the first file to create a session.")
+
+    file_path = run_dir / safe_name
+    file_path.write_bytes(contents)
+
+    audit_logger.log(
+        event_type="FILE_UPLOADED",
+        details={"filename": safe_name, "size_bytes": len(contents), "run_id": run_id},
+        legal_reference="DPDP §8(1) (Data collection for processing)",
+        severity="INFO",
+    )
+
+    return {"filename": safe_name, "path": str(file_path), "runId": run_id}
+
+
+# ---------------------------------------------------------------------------
+# Batch Pipeline — SSE streaming (stateless)
+# ---------------------------------------------------------------------------
 @app.post("/api/run")
 async def run_pipeline(config: RunConfig):
-    global _latest_run_id
-    run_id = str(uuid.uuid4())
-    _encryption_results_store[run_id] = []
-    _run_output_store[run_id] = []
+    """Run the HL7 transformation pipeline on uploaded files.
+    Streams results via SSE. At completion, emits a download token for the ZIP.
+    All temp files are deleted after the ZIP is built.
+
+    [IT Act §67C] — Record preservation during processing.
+    """
+    run_dir = TEMP_ROOT / config.runId
+    if not run_dir.exists():
+        raise HTTPException(status_code=404, detail="Run directory not found. Please upload files first.")
+
+    # Create output subdir within the run's temp dir
+    out_dir = run_dir / "output"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     async def event_generator():
-        global _latest_run_id
+        global _latest_encryption_results
         try:
-            run_output_files = _run_output_store[run_id]
             if config.dataset.lower().startswith("mimic"):
-                # Audit: Pipeline start
+                # -------------------------------------------------------
+                # MIMIC Pipeline — uses preprocess() on uploaded files
+                # -------------------------------------------------------
                 audit_logger.log(
                     event_type="PIPELINE_START",
-                    details={"dataset": config.dataset, "sample_size": config.sampleSize},
+                    details={"dataset": config.dataset, "mode": "batch_mimic", "run_id": config.runId},
                     legal_reference="IT Act §67C (Record preservation)",
                     severity="INFO",
                 )
@@ -110,12 +252,10 @@ async def run_pipeline(config: RunConfig):
                 yield f"data: {json.dumps({'status': 'progress', 'stage': 0, 'message': 'Initializing Preprocessor'})}\n\n"
                 await asyncio.sleep(0.1)
 
-                df = preprocess(data_dir=DATA_DIR, sample_size=config.sampleSize)
+                # preprocess() reads from the temp dir where user uploaded MIMIC files
+                df = preprocess(data_dir=str(run_dir), sample_size=999999)
                 anonymizer = Anonymizer(locale="en_IN")
                 integrity = IntegrityManager()
-
-                out_path = Path(OUT_DIR)
-                out_path.mkdir(parents=True, exist_ok=True)
 
                 patient_groups = list(df.groupby("subject_id"))
                 total = len(patient_groups)
@@ -126,7 +266,6 @@ async def run_pipeline(config: RunConfig):
                 all_encryption_results = []
 
                 for i, (subject_id, group) in enumerate(patient_groups):
-                    # Audit: Record ingested
                     audit_logger.log(
                         event_type="RECORD_INGESTED",
                         subject_id=str(subject_id),
@@ -135,13 +274,10 @@ async def run_pipeline(config: RunConfig):
                         severity="INFO",
                     )
 
-                    # Progress update before starting
                     yield f"data: {json.dumps({'status': 'processing', 'subject_id': str(subject_id), 'index': i, 'total': total})}\n\n"
-                    
-                    # Build message
+
                     hl7_msg = build_hl7_message(subject_id=int(subject_id), patient_rows=group, anonymizer=anonymizer)
 
-                    # Audit: PII anonymised
                     audit_logger.log(
                         event_type="PII_ANONYMISED",
                         subject_id=str(subject_id),
@@ -152,7 +288,6 @@ async def run_pipeline(config: RunConfig):
 
                     signed_msg = integrity.sign_message(hl7_msg)
 
-                    # Audit: Integrity sealed
                     audit_logger.log(
                         event_type="INTEGRITY_SEALED",
                         subject_id=str(subject_id),
@@ -161,7 +296,6 @@ async def run_pipeline(config: RunConfig):
                         severity="INFO",
                     )
 
-                    # Multi-algorithm encryption comparison
                     enc_results = encryption_comparator.compare(hl7_msg)
                     enc_dicts = [asdict(r) for r in enc_results]
                     all_encryption_results.append({
@@ -169,7 +303,6 @@ async def run_pipeline(config: RunConfig):
                         "results": enc_dicts,
                     })
 
-                    # Audit: Encryption applied
                     audit_logger.log(
                         event_type="ENCRYPTION_APPLIED",
                         subject_id=str(subject_id),
@@ -181,18 +314,15 @@ async def run_pipeline(config: RunConfig):
                         legal_reference="IT Act §43A (Reasonable security practices)",
                         severity="INFO",
                     )
-                    
-                    # Write to file
+
                     filename = f"{subject_id}.hl7"
-                    out_file = out_path / filename
+                    out_file = out_dir / filename
                     with open(out_file, "w", encoding="utf-8") as fh:
                         fh.write(signed_msg)
-                    run_output_files.append(filename)
-                    
-                    # Prepare record for frontend
+
                     first_row = group.iloc[0]
                     last_name, first_name = anonymizer.anonymize_name(int(subject_id))
-                    
+
                     record = {
                         "id": str(subject_id),
                         "pseudonym": f"{first_name} {last_name}",
@@ -203,8 +333,7 @@ async def run_pipeline(config: RunConfig):
                         "seal": "Valid",
                         "encryption": enc_dicts,
                     }
-                    
-                    # Audit: Record complete
+
                     audit_logger.log(
                         event_type="RECORD_COMPLETE",
                         subject_id=str(subject_id),
@@ -214,125 +343,124 @@ async def run_pipeline(config: RunConfig):
                     )
 
                     yield f"data: {json.dumps({'status': 'completed', 'record': record})}\n\n"
-                    # Small sleep to allow frontend to breathe and see the updates
                     await asyncio.sleep(0.05)
 
-                # Store for API retrieval (per-run, no race condition)
-                _encryption_results_store[run_id] = all_encryption_results
-                _latest_run_id = run_id
+                # Build ZIP in memory and store with a download token
+                download_token = _build_and_store_zip(out_dir)
 
-                # Audit: Pipeline end
                 audit_logger.log(
                     event_type="PIPELINE_END",
-                    details={"total_records": total, "output_dir": OUT_DIR},
+                    details={"total_records": total, "run_id": config.runId},
                     legal_reference="IT Act §67C (Record preservation)",
                     severity="INFO",
                 )
 
-                yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully'})}\n\n"
-            
+                _latest_encryption_results = all_encryption_results
+
+                yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully', 'downloadToken': download_token, 'encryptionResults': all_encryption_results})}\n\n"
+
             elif config.dataset.lower().startswith("liver") or \
                  config.dataset.lower().startswith("generalized") or \
                  config.dataset.lower() == "ilpd" or \
                  config.filePath:
-                # Generic/Liver Pipeline Ingestion
+                # -------------------------------------------------------
+                # Generic Pipeline
+                # -------------------------------------------------------
+                # Determine which CSV to process
                 if config.filePath:
-                    # P0 FIX: Validate filePath is under UPLOAD_DIR to prevent arbitrary file read
                     resolved = Path(config.filePath).resolve()
-                    allowed_root = Path(UPLOAD_DIR).resolve()
-                    if not str(resolved).startswith(str(allowed_root) + os.sep) and resolved != allowed_root:
-                        yield f"data: {json.dumps({'status': 'error', 'message': 'Invalid file path: must be within uploads directory'})}\n\n"
+                    allowed_root = Path(str(run_dir)).resolve()
+                    if not str(resolved).startswith(str(allowed_root)):
+                        yield f"data: {json.dumps({'status': 'error', 'message': 'Invalid file path'})}\n\n"
                         return
                     csv_to_process = str(resolved)
                 else:
-                    csv_to_process = os.path.join(DATA_DIR, "indian_liver_patient.csv")
-                
+                    # Find any CSV in the run dir
+                    csv_files = list(run_dir.glob("*.csv"))
+                    if not csv_files:
+                        yield f"data: {json.dumps({'status': 'error', 'message': 'No CSV file found in upload'})}\n\n"
+                        return
+                    csv_to_process = str(csv_files[0])
+
                 if not os.path.exists(csv_to_process):
                     yield f"data: {json.dumps({'status': 'error', 'message': f'File not found: {csv_to_process}'})}\n\n"
                     return
 
-                # Load and sample
                 df = pd.read_csv(csv_to_process)
-                n_to_sample = min(len(df), config.sampleSize) if config.sampleSize else len(df)
-                df = df.sample(n=n_to_sample, random_state=42).reset_index(drop=True)
-                
                 total = len(df)
-                logger.debug("[Generic Pipeline] Final dataframe length (randomized): %d", total)
-                
+                logger.debug("[Generic Pipeline] Dataframe length: %d", total)
+
                 audit_logger.log(
                     event_type="PIPELINE_START",
-                    details={"dataset": "generic", "file": csv_to_process, "sample_size": total},
+                    details={"dataset": "generic", "file": csv_to_process, "total_records": total},
                     legal_reference="DPDP §8 (Data collection for processing)",
                     severity="INFO",
                 )
 
                 yield f"data: {json.dumps({'status': 'progress', 'stage': 0, 'message': 'Initializing Generic Pipeline'})}\n\n"
                 await asyncio.sleep(0.1)
-                
+
                 anonymizer = Anonymizer(locale="en_IN")
                 integrity = IntegrityManager()
 
-                # Detect columns
                 cols = df.columns.tolist()
                 gender_col = next((c for c in cols if "gender" in c.lower() or "sex" in c.lower()), None)
                 age_col = next((c for c in cols if "age" in c.lower()), None)
-                
-                # Numeric columns for OBX
                 numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
-                if age_col and age_col in numeric_cols: numeric_cols.remove(age_col)
-                
+                if age_col and age_col in numeric_cols:
+                    numeric_cols.remove(age_col)
+
                 all_encryption_results = []
-                
+
                 for index, row in df.iterrows():
                     subject_id = 900000 + index
-                    
-                    # Build Message
+
                     now = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
                     segments = [
                         f"MSH|^~\\&|GENERIC_PIPELINE|CSV_SOURCE|||{now}||ORU^R01^ORU_R01|{index}|P|2.5.1"
                     ]
-                    
+
                     last, first = anonymizer.anonymize_name(subject_id)
                     gender = "U"
                     if gender_col:
                         g = str(row[gender_col]).upper()
-                        if g.startswith("M"): gender = "M"
-                        elif g.startswith("F"): gender = "F"
-                    
+                        if g.startswith("M"):
+                            gender = "M"
+                        elif g.startswith("F"):
+                            gender = "F"
+
                     age = 0
                     if age_col:
-                        try: age = int(row[age_col])
-                        except: pass
-                    
+                        try:
+                            age = int(row[age_col])
+                        except Exception:
+                            pass
+
                     birth_year = datetime.now().year - age
                     segments.append(f"PID|1||{subject_id}^^^CSV^MR||{last}^{first}^^^||{birth_year}0101|{gender}")
-                    
+
                     obx_id = 1
                     for col in numeric_cols:
                         val = row[col]
                         segments.append(f"OBX|{obx_id}|NM|{col}^GENERIC||{val}||||||F")
                         obx_id += 1
-                        
+
                     hl7_msg = "\n".join(segments)
-                    
-                    # Security Layer: Comparison of Multi-Algorithm Signatures [IT Act Requirement]
+
                     enc_results = encryption_comparator.compare(hl7_msg)
                     enc_dicts = [asdict(r) for r in enc_results]
                     all_encryption_results.append({
                         "subject_id": str(subject_id),
                         "results": enc_dicts,
                     })
-                    
+
                     signed_msg = integrity.sign_message(hl7_msg)
-                    
+
                     filename = f"gen_{subject_id}.hl7"
-                    out_file = Path(OUT_DIR) / filename
+                    out_file = out_dir / filename
                     with open(out_file, "w", encoding="utf-8") as f:
                         f.write(signed_msg)
-                    run_output_files.append(filename)
-                        
-                    # Build record for frontend
-                    # P2 FIX: Only include non-PII numeric columns (data minimisation per DPDP §8(4))
+
                     safe_data = {col: row[col] for col in numeric_cols if col in row.index}
                     record = {
                         "id": str(subject_id),
@@ -343,19 +471,22 @@ async def run_pipeline(config: RunConfig):
                         "output": filename,
                         "seal": "Valid",
                         "encryption": enc_dicts,
-                        "raw_data": safe_data  # Restricted to non-PII numeric columns only
+                        "raw_data": safe_data
                     }
-                    
+
                     yield f"data: {json.dumps({'status': 'completed', 'record': record})}\n\n"
-                    await asyncio.sleep(0.2) # Further increased delay
-                
-                _encryption_results_store[run_id] = all_encryption_results
-                _latest_run_id = run_id
-                yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully'})}\n\n"
+                    await asyncio.sleep(0.05)
+
+                download_token = _build_and_store_zip(out_dir)
+
+                _latest_encryption_results = all_encryption_results
+
+                yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully', 'downloadToken': download_token, 'encryptionResults': all_encryption_results})}\n\n"
             else:
                 yield f"data: {json.dumps({'status': 'error', 'message': 'Unsupported dataset'})}\n\n"
+
         except Exception as e:
-            logging.error(f"Streaming error: {str(e)}")
+            logging.error("Streaming error: %s", str(e))
             audit_logger.log(
                 event_type="PIPELINE_END",
                 details={"error": str(e)},
@@ -363,48 +494,324 @@ async def run_pipeline(config: RunConfig):
                 severity="ERROR",
             )
             yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
+        finally:
+            # Stateless cleanup — delete the entire temp run directory
+            try:
+                shutil.rmtree(run_dir, ignore_errors=True)
+                logger.info("[Stateless] Cleaned up temp dir: %s", run_dir)
+                audit_logger.log(
+                    event_type="DATA_PURGED",
+                    details={"run_id": config.runId, "path": str(run_dir)},
+                    legal_reference="DPDP §8(7) (Data minimisation — immediate deletion)",
+                    severity="INFO",
+                )
+            except Exception as cleanup_err:
+                logger.error("[Stateless] Cleanup failed: %s", cleanup_err)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
+
+def _build_and_store_zip(out_dir: Path) -> str:
+    """Build a ZIP from all .hl7 files in out_dir and store it with a download token."""
+    _cleanup_expired_downloads()  # Housekeeping
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        for hl7_file in out_dir.glob("*.hl7"):
+            zf.write(hl7_file, arcname=hl7_file.name)
+
+    zip_buffer.seek(0)
+    token = str(uuid.uuid4())
+    _download_store[token] = {
+        "data": zip_buffer.getvalue(),
+        "created": time.time(),
+    }
+    return token
+
+
+# ---------------------------------------------------------------------------
+# ZIP Download (token-based, one-time use)
+# ---------------------------------------------------------------------------
+@app.get("/api/download/{token}")
+async def download_zip(token: str):
+    """Serve the ZIP for a given download token, then invalidate it.
+
+    [DPDP §8(7)] — Data minimisation: download tokens are single-use.
+    """
+    _cleanup_expired_downloads()
+
+    entry = _download_store.pop(token, None)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Download token expired or invalid. Files are no longer available.")
+
+    zip_bytes = entry["data"]
+    headers = {
+        "Content-Disposition": (
+            f'attachment; filename="hl7_output_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip"'
+        )
+    }
+    return StreamingResponse(io.BytesIO(zip_bytes), media_type="application/zip", headers=headers)
+
+
+# ---------------------------------------------------------------------------
+# Single Patient Processing — SSE streaming (same UX as batch mode)
+# ---------------------------------------------------------------------------
+@app.post("/api/run-single")
+async def run_single_patient(request: SinglePatientRequest):
+    """Stream single-patient HL7 generation via SSE so the Dashboard
+    can display identical pipeline stages as batch mode.
+
+    [DPDP §8(7)] — Data minimisation: no persistence of patient data.
+    [IT Act §14]  — Secure Electronic Record via SHA-256 signing.
+    """
+    def generate():
+        global _latest_encryption_results
+        try:
+            # Stage 0: Preprocessing
+            yield f"data: {json.dumps({'status': 'progress', 'stage': 0, 'message': 'Validating patient fields...'})}\n\n"
+            time.sleep(0.3)
+
+            anonymizer = Anonymizer(locale="en_IN")
+            integrity = IntegrityManager()
+
+            subject_id_str = request.fields.get("subject_id", str(hash(str(request.fields)) % 900000 + 100000))
+            subject_id = int(subject_id_str)
+            gender = request.fields.get("gender", "U")
+            if gender and len(gender) > 0:
+                gender = gender[0].upper()
+            age = 0
+            try:
+                age = int(request.fields.get("age", "0"))
+            except (ValueError, TypeError):
+                pass
+
+            birth_year = datetime.now().year - age
+            now = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+
+            # Stage 1: Anonymization
+            yield f"data: {json.dumps({'status': 'progress', 'stage': 1, 'message': 'Anonymizing patient identity...'})}\n\n"
+            time.sleep(0.3)
+
+            last_name, first_name = anonymizer.anonymize_name(subject_id)
+            street, city, state, zipcode = anonymizer.anonymize_address(subject_id)
+            pseudonym = f"{first_name} {last_name}"
+
+            # Stage 2: HL7 Generation
+            yield f"data: {json.dumps({'status': 'progress', 'stage': 2, 'message': 'Building HL7 v2.5.1 message...'})}\n\n"
+            time.sleep(0.3)
+
+            segments = [
+                f"MSH|^~\\&|SINGLE_PATIENT|MANUAL_ENTRY|||{now}||ORU^R01^ORU_R01|{subject_id}|P|2.5.1"
+            ]
+            pid_address = f"{street}^^{city}^{state}^{zipcode}"
+            segments.append(
+                f"PID|1||{subject_id}^^^MANUAL^MR||"
+                f"{last_name}^{first_name}^^^||"
+                f"{birth_year}0101|{gender}|||"
+                f"{pid_address}"
+            )
+
+            obx_id = 0
+            for obs in request.observations:
+                obx_id += 1
+                header = obs.get("header", "UNKNOWN")
+                value = obs.get("value", "")
+                try:
+                    float(value)
+                    vtype = "NM"
+                except (ValueError, TypeError):
+                    vtype = "ST"
+                segments.append(f"OBX|{obx_id}|{vtype}|{header}^MANUAL||{value}||||||F|||{now}")
+
+            hl7_msg = "\n".join(segments)
+
+            # Stage 3: Signing + Encryption
+            yield f"data: {json.dumps({'status': 'progress', 'stage': 3, 'message': 'Applying SHA-256 integrity seal and encryption comparison...'})}\n\n"
+            time.sleep(0.3)
+
+            signed_msg = integrity.sign_message(hl7_msg)
+            enc_results = encryption_comparator.compare(hl7_msg)
+            enc_dicts = [asdict(r) for r in enc_results]
+
+            # Audit
+            audit_logger.log(
+                event_type="SINGLE_PATIENT_PROCESSED",
+                subject_id=str(subject_id),
+                details={
+                    "method": "manual_entry",
+                    "observations_count": len(request.observations),
+                    "anonymized": True,
+                },
+                legal_reference="DPDP §8(7) (De-identification) + IT Act §14 (Secure Electronic Record)",
+                severity="INFO",
+            )
+
+            # Emit completed record (matches batch record shape)
+            output_filename = f"patient_{subject_id}.hl7"
+            record = {
+                "id": str(subject_id),
+                "pseudonym": pseudonym,
+                "sex": gender,
+                "cohort": "MANUAL",
+                "labEvents": len(request.observations),
+                "output": output_filename,
+                "seal": "Valid",
+            }
+            yield f"data: {json.dumps({'status': 'completed', 'record': record})}\n\n"
+
+            # Store the signed message in a temp ZIP for download
+            zip_buf = io.BytesIO()
+            with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr(output_filename, signed_msg)
+            zip_buf.seek(0)
+            token = str(uuid.uuid4())
+            _download_store[token] = {"data": zip_buf.getvalue(), "created": time.time()}
+
+            _latest_encryption_results = [{"subject_id": str(subject_id), "results": enc_dicts}]
+
+            # Stage 4: Success
+            yield f"data: {json.dumps({'status': 'success', 'message': 'Processed 1 record successfully', 'downloadToken': token, 'encryptionResults': enc_dicts})}\n\n"
+
+        except Exception as e:
+            logger.error("Single patient pipeline error: %s", str(e), exc_info=True)
+            yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ---------------------------------------------------------------------------
+# Single Patient Processing — direct response (legacy, kept for API compat)
+# ---------------------------------------------------------------------------
+@app.post("/api/process-single")
+async def process_single_patient(request: SinglePatientRequest):
+    """Generate a signed HL7 message from manually entered patient fields.
+    No files are read or written — everything is in-memory.
+
+    [DPDP §8(7)] — Data minimisation: no persistence of patient data.
+    [IT Act §14]  — Secure Electronic Record via SHA-256 signing.
+    """
+    anonymizer = Anonymizer(locale="en_IN")
+    integrity = IntegrityManager()
+
+    # Extract demographics from fields
+    subject_id = int(request.fields.get("subject_id", str(hash(str(request.fields)) % 900000 + 100000)))
+    gender = request.fields.get("gender", "U")
+    if gender and len(gender) > 0:
+        gender = gender[0].upper()
+    age = 0
+    try:
+        age = int(request.fields.get("age", "0"))
+    except (ValueError, TypeError):
+        pass
+
+    birth_year = datetime.now().year - age
+    now = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+
+    last_name, first_name = anonymizer.anonymize_name(subject_id)
+    street, city, state, zipcode = anonymizer.anonymize_address(subject_id)
+
+    # Build HL7 segments
+    segments = [
+        f"MSH|^~\\&|SINGLE_PATIENT|MANUAL_ENTRY|||{now}||ORU^R01^ORU_R01|{subject_id}|P|2.5.1"
+    ]
+
+    pid_address = f"{street}^^{city}^{state}^{zipcode}"
+    segments.append(
+        f"PID|1||{subject_id}^^^MANUAL^MR||"
+        f"{last_name}^{first_name}^^^||"
+        f"{birth_year}0101|{gender}|||"
+        f"{pid_address}"
+    )
+
+    # Build OBX segments from observations
+    obx_id = 0
+    for obs in request.observations:
+        obx_id += 1
+        header = obs.get("header", "UNKNOWN")
+        value = obs.get("value", "")
+        # Determine if numeric
+        try:
+            float(value)
+            vtype = "NM"
+        except (ValueError, TypeError):
+            vtype = "ST"
+        segments.append(f"OBX|{obx_id}|{vtype}|{header}^MANUAL||{value}||||||F|||{now}")
+
+    hl7_msg = "\n".join(segments)
+
+    # Sign with SHA-256
+    signed_msg = integrity.sign_message(hl7_msg)
+
+    # Encryption comparison
+    enc_results = encryption_comparator.compare(hl7_msg)
+    enc_dicts = [asdict(r) for r in enc_results]
+
+    # Audit
+    audit_logger.log(
+        event_type="SINGLE_PATIENT_PROCESSED",
+        subject_id=str(subject_id),
+        details={
+            "method": "manual_entry",
+            "observations_count": len(request.observations),
+            "anonymized": True,
+        },
+        legal_reference="DPDP §8(7) (De-identification) + IT Act §14 (Secure Electronic Record)",
+        severity="INFO",
+    )
+
+    return {
+        "hl7_message": signed_msg,
+        "seal": "Valid",
+        "encryption": enc_dicts,
+        "pseudonym": f"{first_name} {last_name}",
+        "subject_id": str(subject_id),
+    }
+
+
+# ---------------------------------------------------------------------------
+# HL7 Content Viewer (reads from download store, not disk)
+# ---------------------------------------------------------------------------
 @app.get("/api/hl7/{filename}")
 async def get_hl7_content(filename: str):
-    file_path = Path(OUT_DIR) / filename
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    with open(file_path, "r") as f:
-        content = f.read()
-    
-    return {"content": content}
+    """Serve HL7 content. In stateless mode, files may no longer be on disk
+    after the run completes. This endpoint is used during active SSE streams
+    when temp files still exist.
+    """
+    # Try to find the file in any active temp dir
+    for run_dir in TEMP_ROOT.iterdir():
+        if run_dir.is_dir():
+            out_dir = run_dir / "output"
+            file_path = out_dir / filename
+            if file_path.exists():
+                with open(file_path, "r") as f:
+                    content = f.read()
+                return {"content": content}
 
+    raise HTTPException(status_code=404, detail="File not found. In stateless mode, files are deleted after download.")
+
+
+# ---------------------------------------------------------------------------
+# Existing endpoints (unchanged)
+# ---------------------------------------------------------------------------
 @app.get("/api/logs")
 async def get_logs():
     log_file = Path("pipeline.log")
     if not log_file.exists():
         return {"logs": []}
-    
     with open(log_file, "r") as f:
         lines = f.readlines()
-    
-    # Return last 50 lines
     return {"logs": lines[-50:]}
 
-# ---------------------------------------------------------------
-# NEW: Encryption Comparison Endpoint
-# ---------------------------------------------------------------
 
 @app.get("/api/encryption-comparison")
 async def get_encryption_comparison():
-    """Return the latest encryption comparison results from the last pipeline run."""
-    results = _encryption_results_store.get(_latest_run_id, []) if _latest_run_id else []
+    """Return encryption comparison algorithms info."""
+    global _latest_encryption_results
     return {
-        "results": results,
+        "results": _latest_encryption_results,
         "algorithms": ["SHA-256", "AES-256-CBC", "HMAC-SHA512", "SHA3-256"],
     }
 
-# ---------------------------------------------------------------
-# NEW: Audit Log Endpoints
-# ---------------------------------------------------------------
 
 @app.get("/api/audit-log")
 async def get_audit_log(event_type: Optional[str] = None, severity: Optional[str] = None, limit: int = 100):
@@ -415,6 +822,7 @@ async def get_audit_log(event_type: Optional[str] = None, severity: Optional[str
         "entries": entries,
         "stats": stats,
     }
+
 
 @app.post("/api/audit-log/clear")
 async def clear_audit_log(authorization: Optional[str] = FastAPIHeader(default=None)):
@@ -432,21 +840,21 @@ async def clear_audit_log(authorization: Optional[str] = FastAPIHeader(default=N
     )
     return {"status": "cleared"}
 
-# ---------------------------------------------------------------
-# NEW: Breach Detection Endpoints
-# ---------------------------------------------------------------
 
 @app.post("/api/breach-scan")
 async def run_breach_scan():
-    """Run a full breach detection scan on the output directory."""
+    """Run a full breach detection scan on any active temp output directories."""
     audit_logger.log(
         event_type="BREACH_SCAN_START",
-        details={"output_dir": OUT_DIR},
+        details={"mode": "stateless"},
         legal_reference="DPDP §15 (Breach detection)",
         severity="INFO",
     )
 
-    results = breach_detector.full_scan()
+    # In stateless mode, scan any currently active temp dirs
+    # Create a temporary BreachDetector pointing to temp root
+    detector = BreachDetector(output_dir=str(TEMP_ROOT))
+    results = detector.full_scan()
 
     if results["summary"]["critical"] > 0 or results["summary"]["high"] > 0:
         audit_logger.log(
@@ -458,9 +866,6 @@ async def run_breach_scan():
 
     return results
 
-# ---------------------------------------------------------------
-# Compliance Score Endpoint
-# ---------------------------------------------------------------
 
 @app.get("/api/compliance-score")
 async def get_compliance_score():
@@ -471,140 +876,72 @@ async def get_compliance_score():
         has_encryption=True,
         has_audit_log=True,
         has_breach_detector=True,
-        output_dir=OUT_DIR,
+        output_dir=str(TEMP_ROOT),
     )
 
-# ---------------------------------------------------------------
-# Data Lineage Endpoints
-# ---------------------------------------------------------------
 
 @app.get("/api/data-lineage")
 async def get_data_lineage():
     """Return the complete data lineage graph."""
     return data_lineage.get_lineage()
 
+
 @app.get("/api/data-lineage/{field_name}")
 async def get_field_lineage(field_name: str):
     """Trace lineage for a specific field."""
     return data_lineage.get_field_lineage(field_name)
 
-# ---------------------------------------------------------------
-# Risk Assessment Endpoint
-# ---------------------------------------------------------------
 
 @app.get("/api/risk-assessment")
 async def get_risk_assessment():
     """Return the complete risk assessment matrix."""
     return risk_assessor.assess()
 
-# ---------------------------------------------------------------
-# Access Control Endpoints
-# ---------------------------------------------------------------
 
 @app.get("/api/access-control")
 async def get_access_control():
     """Return all RBAC roles and permissions."""
     return access_control.get_roles()
 
+
 @app.get("/api/access-control/matrix")
 async def get_access_matrix():
     """Return the roles × resources access matrix."""
     return access_control.get_access_matrix()
 
-# ---------------------------------------------------------------
-# NEW: File Upload Endpoint
-# ---------------------------------------------------------------
-
-@app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    """Upload a custom CSV for processing."""
-    # P0 FIX: Sanitize filename to prevent path traversal
-    safe_name = Path(file.filename).name  # strips any directory components like ../
-    if not safe_name:
-        raise HTTPException(status_code=400, detail="Invalid filename")
-    
-    # Enforce .csv extension allowlist
-    allowed_extensions = {".csv"}
-    file_ext = Path(safe_name).suffix.lower()
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type '{file_ext}' not allowed. Only {allowed_extensions} are accepted."
-        )
-    
-    file_path = Path(UPLOAD_DIR) / safe_name
-    with open(file_path, "wb") as buffer:
-        buffer.write(await file.read())
-    
-    audit_logger.log(
-        event_type="FILE_UPLOADED",
-        details={"filename": safe_name, "path": str(file_path)},
-        legal_reference="DPDP §8 (Data collection)",
-        severity="INFO",
-    )
-    
-    return {"filename": safe_name, "path": str(file_path)}
-
-# ---------------------------------------------------------------
-# NEW: Stats Endpoint for Landing Page
-# ---------------------------------------------------------------
-
-@app.get("/api/stats")
-async def get_stats():
-    """Return aggregated stats for the landing page."""
-    # Count processed HL7 files
-    processed_count = len(list(Path(OUT_DIR).glob("*.hl7")))
-    
-    # Get current risk/compliance indices
-    risk = risk_assessor.assess()
-    score = compliance_scorer.score(
-        has_anonymizer=True, has_integrity=True, has_encryption=True,
-        has_audit_log=True, has_breach_detector=True, output_dir=OUT_DIR
-    )
-    
-    return {
-        "legal_sections": 24, # Representing mapped sections
-        "offences": 14,
-        "case_studies": 9,
-        "records_processed": processed_count,
-        "compliance_index": score["overall_score"],
-        "risk_threats": risk["summary"]["total"],
-        "system_state": "SECURE" if score["overall_score"] > 80 else "WARNING"
-    }
-
-@app.get("/api/download-all")
-async def download_all_hl7():
-    """Bundle only the most recently generated HL7 files into a ZIP for download."""
-    if not _latest_run_id:
-        raise HTTPException(status_code=404, detail="No processed run is available to download")
-
-    latest_run_files = _run_output_store.get(_latest_run_id, [])
-    if not latest_run_files:
-        raise HTTPException(status_code=404, detail="No HL7 files found for the latest run")
-
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        for filename in latest_run_files:
-            file_path = Path(OUT_DIR) / filename
-            if not file_path.exists():
-                continue
-            zip_file.write(file_path, arcname=file_path.name)
-
-    if zip_buffer.tell() == 0:
-        raise HTTPException(status_code=404, detail="Latest run files are no longer available on disk")
-
-    zip_buffer.seek(0)
-    headers = {
-        "Content-Disposition": (
-            f'attachment; filename="hl7_output_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip"'
-        )
-    }
-    return StreamingResponse(zip_buffer, media_type="application/zip", headers=headers)
 
 @app.get("/api/access-control/check")
 async def check_access(role: str, resource: str, action: str = "read"):
     """Check if a role has access to a resource."""
     return access_control.check_access(role, resource, action)
+
+
+@app.get("/api/stats")
+async def get_stats():
+    """Return aggregated stats for the landing page."""
+    risk = risk_assessor.assess()
+    score = compliance_scorer.score(
+        has_anonymizer=True, has_integrity=True, has_encryption=True,
+        has_audit_log=True, has_breach_detector=True, output_dir=str(TEMP_ROOT)
+    )
+
+    return {
+        "legal_sections": 24,
+        "offences": 14,
+        "case_studies": 9,
+        "records_processed": 0,  # Stateless — no persistent count
+        "compliance_index": score["overall_score"],
+        "risk_threats": risk["summary"]["total"],
+        "system_state": "SECURE" if score["overall_score"] > 80 else "WARNING"
+    }
+
+
+# ---------------------------------------------------------------------------
+# Static file serving (production: serve frontend/dist/)
+# ---------------------------------------------------------------------------
+if os.path.isdir("frontend/dist"):
+    app.mount("/", StaticFiles(directory="frontend/dist", html=True), name="static")
+
 
 if __name__ == "__main__":
     import uvicorn
