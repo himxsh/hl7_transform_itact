@@ -26,6 +26,7 @@ interface PatientRecord {
   output: string;
   seal: 'Valid' | 'Tampered';
   raw_data?: Record<string, any>;
+  content?: string;
 }
 
 // --- Sub-components ---
@@ -86,7 +87,15 @@ const ConfigItem = ({ label, value }: { label: string, value: string }) => (
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { dataset: selectedDataset = 'MIMIC-IV v3.1', sampleSize = 50 } = (location.state as { dataset: string; sampleSize: number }) || {};
+  const locState = (location.state || {}) as {
+    mode?: 'single' | 'batch';
+    dataset?: string;
+    runId?: string;
+    filePath?: string;
+    singlePatientData?: { fields: Record<string, string>; observations: { header: string; value: string }[] };
+  };
+  const selectedDataset = locState.dataset || 'MIMIC-IV v3.1';
+  const pipelineMode = locState.mode || 'batch';
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStage, setCurrentStage] = useState(-1);
@@ -98,6 +107,7 @@ export default function Dashboard() {
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [downloadToken, setDownloadToken] = useState<string | null>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const headersInitialized = useRef(false);
   const hasRunRef = useRef(false);
@@ -138,19 +148,33 @@ export default function Dashboard() {
     setCurrentStage(0);
 
     try {
-      const { dataset, sampleSize, filePath } = (location.state as { dataset: string; sampleSize: number; filePath?: string }) || { dataset: 'mimic', sampleSize: 50 };
+      const dataset = locState.dataset || 'mimic';
       const isMIMIC = dataset.toLowerCase().includes('mimic');
+      let response: Response;
 
-      if (isMIMIC) {
-        setTableHeaders(['Subject ID', 'Pseudonym', 'Sex', 'Cohort', 'Lab Events', 'Output']);
+      if (pipelineMode === 'single' && locState.singlePatientData) {
+        // Single patient mode — stream via /api/run-single
+        setTableHeaders(['Subject ID', 'Pseudonym', 'Sex', 'Observations', 'Output']);
         headersInitialized.current = true;
-      }
 
-      const response = await fetch('/api/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset, sampleSize, filePath })
-      });
+        response = await fetch('/api/run-single', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(locState.singlePatientData),
+        });
+      } else {
+        // Batch mode
+        if (isMIMIC) {
+          setTableHeaders(['Subject ID', 'Pseudonym', 'Sex', 'Cohort', 'Lab Events', 'Output']);
+          headersInitialized.current = true;
+        }
+
+        response = await fetch('/api/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataset, runId: locState.runId || '', filePath: locState.filePath }),
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`Pipeline request failed with status ${response.status}`);
@@ -200,7 +224,10 @@ export default function Dashboard() {
               if (prev.find(r => r.id === data.record.id)) return prev;
               const updated = [...prev, data.record];
               console.log(`[DEBUG] Dashboard Record Added: ${data.record.id} (Current Count: ${updated.length})`);
-              if (updated.length === 1) fetchHL7(data.record.output);
+              if (updated.length === 1) {
+                setActiveFile(data.record.output);
+                setHl7Content(data.record.content || '');
+              }
               return updated;
             });
             
@@ -216,6 +243,7 @@ export default function Dashboard() {
             setCurrentStage(3);
           } else if (data.status === 'success') {
             setCurrentStage(4);
+            if (data.downloadToken) setDownloadToken(data.downloadToken);
           } else if (data.status === 'error') {
             throw new Error(data.message || 'Pipeline failed');
           }
@@ -240,6 +268,7 @@ export default function Dashboard() {
             });
           } else if (data?.status === 'success') {
             setCurrentStage(4);
+            if (data.downloadToken) setDownloadToken(data.downloadToken);
           } else if (data?.status === 'error') {
             throw new Error(data.message || 'Pipeline failed');
           }
@@ -264,19 +293,15 @@ export default function Dashboard() {
     }
   }, [validationLogs]);
 
-  const fetchHL7 = async (filename: string) => {
-    try {
-      setActiveFile(filename);
-      const response = await fetch(`/api/hl7/${filename}`);
-      const data = await response.json();
-      setHl7Content(data.content);
-    } catch (error) {
-      console.error('Failed to fetch HL7:', error);
-    }
+  const fetchHL7 = (record: PatientRecord) => {
+    setActiveFile(record.output);
+    setHl7Content(record.content || 'Content unavailable (Stateless run finished).');
   };
 
   const downloadAllHL7 = () => {
-    window.location.href = '/api/download-all';
+    if (downloadToken) {
+      window.location.href = `/api/download/${downloadToken}`;
+    }
   };
 
   const isMIMIC = selectedDataset.toLowerCase().includes('mimic');
@@ -335,6 +360,13 @@ export default function Dashboard() {
         </header>
 
         <main className="flex-1 overflow-y-auto p-8 space-y-8">
+          {/* Ephemeral session banner */}
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-warn-amber/10 border border-warn-amber/20 rounded">
+            <ShieldAlert size={14} className="text-warn-amber shrink-0" />
+            <span className="text-[10px] uppercase tracking-wider text-warn-amber/80 font-mono">
+              Stateless session — Your files are processed in-memory and deleted after download
+            </span>
+          </div>
           <section className="grid grid-cols-4 gap-6">
             <StatCard label="Records Processed" value={records.length} />
             <StatCard label="HL7 Files Generated" value={records.length} />
@@ -381,7 +413,7 @@ export default function Dashboard() {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.2 }}
-                        onClick={() => fetchHL7(record.output)}
+                        onClick={() => fetchHL7(record)}
                         className={`hover:bg-gold/5 transition-colors group cursor-pointer ${activeFile === record.output ? 'bg-gold/10' : ''}`}
                       >
                         <td className="px-4 py-3.5">{record.id}</td>
@@ -471,10 +503,10 @@ export default function Dashboard() {
                   <h3 className="text-gold uppercase tracking-[0.2em] text-[11px]">Orchestration Config</h3>
                 </div>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-5 technical-data text-[10px]">
-                  <ConfigItem label="Execution Mode" value="Batch / Automated" />
+                  <ConfigItem label="Execution Mode" value="Batch / Stateless" />
                   <ConfigItem label="Input Source" value={selectedDataset} />
                   <ConfigItem label="Anonymization" value="Mapping: Indo-Surnames" />
-                  <ConfigItem label="Output Format" value="v0.0.1 Pipe Delimited" />
+                  <ConfigItem label="Data Persistence" value="None (Ephemeral)" />
                 </div>
               </section>
             </div>

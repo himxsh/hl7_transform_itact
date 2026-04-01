@@ -332,6 +332,7 @@ async def run_pipeline(config: RunConfig):
                         "output": filename,
                         "seal": "Valid",
                         "encryption": enc_dicts,
+                        "content": signed_msg,
                     }
 
                     audit_logger.log(
@@ -471,7 +472,8 @@ async def run_pipeline(config: RunConfig):
                         "output": filename,
                         "seal": "Valid",
                         "encryption": enc_dicts,
-                        "raw_data": safe_data
+                        "raw_data": safe_data,
+                        "content": signed_msg,
                     }
 
                     yield f"data: {json.dumps({'status': 'completed', 'record': record})}\n\n"
@@ -656,6 +658,7 @@ async def run_single_patient(request: SinglePatientRequest):
                 "labEvents": len(request.observations),
                 "output": output_filename,
                 "seal": "Valid",
+                "content": signed_msg,
             }
             yield f"data: {json.dumps({'status': 'completed', 'record': record})}\n\n"
 
