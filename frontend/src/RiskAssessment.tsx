@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { AlertTriangle, Shield, RefreshCw } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 import { useState, useEffect } from 'react';
 
 interface Threat {
@@ -181,6 +182,7 @@ export default function RiskAssessment() {
       <main className="max-w-[1200px] mx-auto px-6 py-24">
         <RiskAssessmentContent />
       </main>
+      <Footer />
     </div>
   );
 }

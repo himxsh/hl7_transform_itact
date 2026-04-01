@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'motion/react';
 import { Lock, Unlock, Users, Shield, ShieldAlert, User } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 import { useState, useEffect } from 'react';
 
 interface Permission {
@@ -183,6 +184,7 @@ export default function AccessControl() {
       <main className="max-w-[1200px] mx-auto px-6 py-24">
         <AccessControlContent />
       </main>
+      <Footer />
     </div>
   );
 }

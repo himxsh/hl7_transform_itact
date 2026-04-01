@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { GitBranch, ArrowRight, Search } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 import { useState, useEffect } from 'react';
 
 interface LineageNode {
@@ -206,6 +207,7 @@ export default function DataLineage() {
       <main className="max-w-[1200px] mx-auto px-6 py-24">
         <DataLineageContent />
       </main>
+      <Footer />
     </div>
   );
 }

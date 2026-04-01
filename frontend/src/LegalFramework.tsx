@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { BookOpen, Scale, Clock, Layers, ChevronRight } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 import { useState } from 'react';
 
 const definitions = [
@@ -236,6 +237,7 @@ export default function LegalFramework() {
           </div>
         </motion.section>
       </main>
+      <Footer />
     </div>
   );
 }

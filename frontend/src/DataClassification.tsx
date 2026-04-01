@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Layers, Database, Shield, AlertTriangle } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 
 const categories = [
   {
@@ -232,6 +233,7 @@ export default function DataClassification() {
           </div>
         </motion.section>
       </main>
+      <Footer />
     </div>
   );
 }

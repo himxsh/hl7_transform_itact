@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Gavel, Scale, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 import { useState } from 'react';
 
 type CaseCategory = 'all' | 'it-act' | 'dpdp' | 'gdpr';
@@ -239,6 +240,7 @@ export default function CaseStudies() {
 
         <div className="mt-8 font-mono text-[10px] text-neutral-dark/30 text-center">{filtered.length} case{filtered.length !== 1 ? 's' : ''} displayed</div>
       </main>
+      <Footer />
     </div>
   );
 }

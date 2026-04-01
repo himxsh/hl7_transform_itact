@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { AlertTriangle, Scale, ShieldAlert, Gavel } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 
 const itActOffences = [
   { section: '§43', offence: 'Damage to Computer System', penalty: 'Compensation up to ₹1 Crore', type: 'Civil', severity: 60, details: 'Unauthorised access, download, virus introduction, damage, disruption, denial of access, manipulation, theft of computer source code.' },
@@ -195,6 +196,7 @@ export default function Penalties() {
           </div>
         </motion.section>
       </main>
+      <Footer />
     </div>
   );
 }

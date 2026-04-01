@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Globe, Scale, ShieldAlert, BookOpen, ArrowLeftRight } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 
 const gdprPrinciples = [
   { article: 'Art. 5(1)(a)', name: 'Lawfulness, Fairness & Transparency', description: 'Personal data must be processed lawfully, fairly, and transparently. The data subject must be informed of the processing.' },
@@ -256,6 +257,7 @@ export default function GDPR() {
           </div>
         </motion.section>
       </main>
+      <Footer />
     </div>
   );
 }

@@ -8,7 +8,8 @@ import {
   ShieldAlert,
   ChevronRight,
   Terminal,
-  Settings
+  Settings,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useLocation, useBlocker } from 'react-router-dom';
@@ -96,6 +97,7 @@ export default function Dashboard() {
   const [validationLogs, setValidationLogs] = useState<{time: string, file: string, status: string}[]>([]);
   const [isSecurityModalOpen, setIsSecurityModalOpen] = useState(false);
   const [showExitWarning, setShowExitWarning] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const logContainerRef = useRef<HTMLDivElement>(null);
   const headersInitialized = useRef(false);
   const hasRunRef = useRef(false);
@@ -131,6 +133,7 @@ export default function Dashboard() {
     setIsProcessing(true);
     setRecords([]);
     setTableHeaders([]);
+    setErrorMessage('');
     headersInitialized.current = false;
     setCurrentStage(0);
 
@@ -149,8 +152,14 @@ export default function Dashboard() {
         body: JSON.stringify({ dataset, sampleSize, filePath })
       });
 
+      if (!response.ok) {
+        throw new Error(`Pipeline request failed with status ${response.status}`);
+      }
+
       const reader = response.body?.getReader();
-      if (!reader) return;
+      if (!reader) {
+        throw new Error('Pipeline response stream was not available');
+      }
 
       const decoder = new TextDecoder();
       let buffer = '';
@@ -166,46 +175,49 @@ export default function Dashboard() {
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
 
+          let data: any;
           try {
-            const data = JSON.parse(line.slice(6));
-
-            if (data.status === 'progress') {
-              setCurrentStage(data.stage);
-            } else if (data.status === 'processing') {
-              if (currentStage < 2) setCurrentStage(2);
-            } else if (data.status === 'completed') {
-              if (!isMIMIC && data.record.raw_data && !headersInitialized.current) {
-                const featureKeys = Object.keys(data.record.raw_data).filter(k =>
-                  !['id', 'Dataset'].includes(k)
-                );
-                setTableHeaders(['Subject ID', 'Pseudonym', 'Sex', ...featureKeys, 'Output']);
-                headersInitialized.current = true;
-              }
-
-                setRecords(prev => {
-                  if (prev.find(r => r.id === data.record.id)) return prev;
-                  const updated = [...prev, data.record];
-                  console.log(`[DEBUG] Dashboard Record Added: ${data.record.id} (Current Count: ${updated.length})`);
-                  if (updated.length === 1) fetchHL7(data.record.output);
-                  return updated;
-                });
-                
-                // Add to real-time integrity log
-                setValidationLogs(prev => [
-                  ...prev,
-                  {
-                    time: new Date().toLocaleTimeString([], { hour12: false }),
-                    file: data.record.output,
-                    status: 'PASS'
-                  }
-                ]);
-                
-                setCurrentStage(3);
-            } else if (data.status === 'success') {
-              setCurrentStage(4);
-            }
+            data = JSON.parse(line.slice(6));
           } catch (e) {
             console.error('Error parsing stream line:', e);
+            continue;
+          }
+
+          if (data.status === 'progress') {
+            setCurrentStage(data.stage);
+          } else if (data.status === 'processing') {
+            if (currentStage < 2) setCurrentStage(2);
+          } else if (data.status === 'completed') {
+            if (!isMIMIC && data.record.raw_data && !headersInitialized.current) {
+              const featureKeys = Object.keys(data.record.raw_data).filter(k =>
+                !['id', 'Dataset'].includes(k)
+              );
+              setTableHeaders(['Subject ID', 'Pseudonym', 'Sex', ...featureKeys, 'Output']);
+              headersInitialized.current = true;
+            }
+
+            setRecords(prev => {
+              if (prev.find(r => r.id === data.record.id)) return prev;
+              const updated = [...prev, data.record];
+              console.log(`[DEBUG] Dashboard Record Added: ${data.record.id} (Current Count: ${updated.length})`);
+              if (updated.length === 1) fetchHL7(data.record.output);
+              return updated;
+            });
+            
+            setValidationLogs(prev => [
+              ...prev,
+              {
+                time: new Date().toLocaleTimeString([], { hour12: false }),
+                file: data.record.output,
+                status: 'PASS'
+              }
+            ]);
+            
+            setCurrentStage(3);
+          } else if (data.status === 'success') {
+            setCurrentStage(4);
+          } else if (data.status === 'error') {
+            throw new Error(data.message || 'Pipeline failed');
           }
         }
       }
@@ -214,23 +226,29 @@ export default function Dashboard() {
       if (buffer.trim()) {
         const line = buffer;
         if (line.startsWith('data: ')) {
+          let data: any = null;
           try {
-            const data = JSON.parse(line.slice(6));
-            if (data.status === 'completed') {
-              setRecords(prev => {
-                if (prev.find(r => r.id === data.record.id)) return prev;
-                return [...prev, data.record];
-              });
-            } else if (data.status === 'success') {
-              setCurrentStage(4);
-            }
+            data = JSON.parse(line.slice(6));
           } catch (e) {
             console.error('Error parsing trailing buffer:', e);
+          }
+
+          if (data?.status === 'completed') {
+            setRecords(prev => {
+              if (prev.find(r => r.id === data.record.id)) return prev;
+              return [...prev, data.record];
+            });
+          } else if (data?.status === 'success') {
+            setCurrentStage(4);
+          } else if (data?.status === 'error') {
+            throw new Error(data.message || 'Pipeline failed');
           }
         }
       }
     } catch (error) {
       console.error('Failed to run pipeline:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Pipeline failed to run');
+      hasRunRef.current = false;
     } finally {
       setIsProcessing(false);
     }
@@ -257,6 +275,10 @@ export default function Dashboard() {
     }
   };
 
+  const downloadAllHL7 = () => {
+    window.location.href = '/api/download-all';
+  };
+
   const isMIMIC = selectedDataset.toLowerCase().includes('mimic');
 
   return (
@@ -279,16 +301,33 @@ export default function Dashboard() {
           <div className="flex items-center space-x-6">
             <div className="flex flex-col items-end">
               {currentStage === 4 ? (
-                <button
-                  onClick={() => setIsSecurityModalOpen(true)}
-                  className="px-3 py-1 bg-ok-green text-charcoal border border-ok-green/50 text-[10px] font-bold uppercase tracking-tight mb-1 rounded hover:bg-white hover:border-white transition-all shadow-[0_0_15px_rgba(106,158,114,0.4)]"
-                >
-                  Orchestration Complete → View Audit
-                </button>
+                <div className="flex items-center gap-2 mb-1">
+                  <button
+                    onClick={downloadAllHL7}
+                    className="px-3 py-1 border border-gold/40 text-gold text-[10px] font-bold uppercase tracking-tight rounded hover:bg-gold hover:text-charcoal transition-all flex items-center gap-2"
+                  >
+                    <Download size={12} />
+                    Download HL7 ZIP
+                  </button>
+                  <button
+                    onClick={() => setIsSecurityModalOpen(true)}
+                    className="px-3 py-1 bg-ok-green text-charcoal border border-ok-green/50 text-[10px] font-bold uppercase tracking-tight rounded hover:bg-white hover:border-white transition-all shadow-[0_0_15px_rgba(106,158,114,0.4)]"
+                  >
+                    Orchestration Complete → View Audit
+                  </button>
+                </div>
               ) : isProcessing ? (
                 <span className="px-2 py-0.5 bg-gold/10 text-gold animate-pulse border border-gold/20 text-[9px] uppercase tracking-tighter mb-1 rounded">
                   Pipeline Active
                 </span>
+              ) : records.length > 0 ? (
+                <button
+                  onClick={downloadAllHL7}
+                  className="px-3 py-1 border border-gold/40 text-gold text-[10px] font-bold uppercase tracking-tight mb-1 rounded hover:bg-gold hover:text-charcoal transition-all flex items-center gap-2"
+                >
+                  <Download size={12} />
+                  Download HL7 ZIP
+                </button>
               ) : null}
               <span className="text-[10px] technical-data text-white/40">{selectedDataset}</span>
             </div>
@@ -302,6 +341,13 @@ export default function Dashboard() {
             <StatCard label="Integrity Seals Valid" value={records.length} subValue={records.length.toString()} color="text-ok-green" />
             <StatCard label="PII Instances Scrubbed" value={records.length * (isMIMIC ? 8 : 4)} />
           </section>
+
+          {errorMessage && (
+            <section className="glass-panel border border-red-400/30 bg-red-500/10 p-4">
+              <h3 className="text-red-300 uppercase tracking-[0.2em] text-[11px] mb-2">Pipeline Error</h3>
+              <p className="text-sm text-red-100/90">{errorMessage}</p>
+            </section>
+          )}
 
           <section className="glass-panel p-8 relative overflow-hidden">
             <h3 className="text-gold uppercase tracking-[0.2em] text-[11px] mb-10">Current Orchestration Flow</h3>

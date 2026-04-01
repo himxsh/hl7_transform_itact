@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { ArrowRight, Globe, Baby, Database, Trash2, RefreshCw } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 
 const lifecycleStages = [
   { id: 'collection', label: 'Collection', icon: '📥', color: 'bg-blue-50 border-blue-200 text-blue-800', description: 'Raw clinical data is ingested from MIMIC-IV or CSV sources. Only essential columns are retained (data minimisation).', legal: 'DPDP §4 (Consent), §8(3) (Purpose Limitation)' },
@@ -186,6 +187,7 @@ export default function DataLifecycle() {
           </div>
         </motion.section>
       </main>
+      <Footer />
     </div>
   );
 }

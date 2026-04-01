@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { UserCheck, ToggleRight, FileText, Shield, Clock, AlertTriangle } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 import { useState } from 'react';
 
 interface ConsentRecord {
@@ -226,6 +227,7 @@ export default function ConsentManagement() {
           </div>
         </motion.section>
       </main>
+      <Footer />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { Heart, Building2, ArrowLeftRight, Shield, FileText, Scale } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 
 const nehaFunctions = [
   'Develop and maintain standards for Electronic Health Records (EHR)',
@@ -250,6 +251,7 @@ export default function Healthcare() {
           </div>
         </motion.section>
       </main>
+      <Footer />
     </div>
   );
 }

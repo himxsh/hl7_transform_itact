@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Header as FastAPIHeader
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -22,8 +23,11 @@ import pandas as pd
 import json
 from dataclasses import asdict
 from datetime import datetime, timezone
+import io
+import zipfile
 
 app = FastAPI()
+logger = logging.getLogger("hl7_pipeline.app")
 
 # Enable CORS
 app.add_middleware(
@@ -53,6 +57,7 @@ access_control = AccessControlSimulator()
 
 # Cache for encryption comparison results, keyed by run_id to avoid race conditions
 _encryption_results_store: dict = {}
+_run_output_store: dict = {}
 _latest_run_id: Optional[str] = None
 
 # Admin token for destructive operations (loaded from env)
@@ -87,10 +92,12 @@ async def run_pipeline(config: RunConfig):
     global _latest_run_id
     run_id = str(uuid.uuid4())
     _encryption_results_store[run_id] = []
+    _run_output_store[run_id] = []
 
     async def event_generator():
         global _latest_run_id
         try:
+            run_output_files = _run_output_store[run_id]
             if config.dataset.lower().startswith("mimic"):
                 # Audit: Pipeline start
                 audit_logger.log(
@@ -180,6 +187,7 @@ async def run_pipeline(config: RunConfig):
                     out_file = out_path / filename
                     with open(out_file, "w", encoding="utf-8") as fh:
                         fh.write(signed_msg)
+                    run_output_files.append(filename)
                     
                     # Prepare record for frontend
                     first_row = group.iloc[0]
@@ -321,6 +329,7 @@ async def run_pipeline(config: RunConfig):
                     out_file = Path(OUT_DIR) / filename
                     with open(out_file, "w", encoding="utf-8") as f:
                         f.write(signed_msg)
+                    run_output_files.append(filename)
                         
                     # Build record for frontend
                     # P2 FIX: Only include non-PII numeric columns (data minimisation per DPDP §8(4))
@@ -562,6 +571,35 @@ async def get_stats():
         "risk_threats": risk["summary"]["total"],
         "system_state": "SECURE" if score["overall_score"] > 80 else "WARNING"
     }
+
+@app.get("/api/download-all")
+async def download_all_hl7():
+    """Bundle only the most recently generated HL7 files into a ZIP for download."""
+    if not _latest_run_id:
+        raise HTTPException(status_code=404, detail="No processed run is available to download")
+
+    latest_run_files = _run_output_store.get(_latest_run_id, [])
+    if not latest_run_files:
+        raise HTTPException(status_code=404, detail="No HL7 files found for the latest run")
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for filename in latest_run_files:
+            file_path = Path(OUT_DIR) / filename
+            if not file_path.exists():
+                continue
+            zip_file.write(file_path, arcname=file_path.name)
+
+    if zip_buffer.tell() == 0:
+        raise HTTPException(status_code=404, detail="Latest run files are no longer available on disk")
+
+    zip_buffer.seek(0)
+    headers = {
+        "Content-Disposition": (
+            f'attachment; filename="hl7_output_{datetime.now().strftime("%Y%m%d_%H%M%S")}.zip"'
+        )
+    }
+    return StreamingResponse(zip_buffer, media_type="application/zip", headers=headers)
 
 @app.get("/api/access-control/check")
 async def check_access(role: str, resource: str, action: str = "read"):

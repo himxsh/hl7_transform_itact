@@ -12,6 +12,7 @@ import {
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
 
 export default function DatabaseSelection() {
   const navigate = useNavigate();
@@ -231,10 +232,8 @@ export default function DatabaseSelection() {
             </button>
           </div>
         </main>
-
-        {/* Footer */}
-
       </div>
+      <Footer />
     </div>
   );
 }

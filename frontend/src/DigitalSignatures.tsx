@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { KeyRound, ShieldCheck, Landmark, FileKey, UserCheck, ArrowRight } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 
 const itActSections = [
   { id: '§2(1)(p)', title: 'Digital Signature', description: 'Authentication of an electronic record by a subscriber by means of an electronic method in accordance with the provisions of §3.' },
@@ -242,6 +243,7 @@ export default function DigitalSignatures() {
           </div>
         </motion.section>
       </main>
+      <Footer />
     </div>
   );
 }

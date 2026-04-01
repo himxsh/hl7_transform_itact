@@ -1,5 +1,6 @@
 import { Shield, Lock, FileCheck, Scale, Info, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 import { motion } from 'motion/react';
 
 export default function Compliance() {
@@ -235,6 +236,7 @@ export default function Compliance() {
           </div>
         </motion.div>
       </main>
+      <Footer />
     </div>
   );
 }

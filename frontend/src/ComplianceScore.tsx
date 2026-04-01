@@ -1,6 +1,7 @@
 import { motion } from 'motion/react';
 import { ShieldCheck, CheckCircle2, AlertTriangle, XCircle, RefreshCw } from 'lucide-react';
 import Header from './Header';
+import Footer from './Footer';
 import { useState, useEffect } from 'react';
 
 interface Check {
@@ -150,6 +151,7 @@ export default function ComplianceScore() {
       <main className="max-w-[1200px] mx-auto px-6 py-24">
         <ComplianceScoreContent />
       </main>
+      <Footer />
     </div>
   );
 }
