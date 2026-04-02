@@ -17,7 +17,6 @@ RUN pip install --no-cache-dir -r requirements.txt && python setup.py install
 
 # Copy application code
 COPY pipelines/ pipelines/
-COPY mappings/ mappings/
 COPY app.py preprocess_mimic.py validate_integrity.py ./
 
 # Copy built frontend
