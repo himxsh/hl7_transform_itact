@@ -37,7 +37,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="bg-[#f7f7f6] text-[#1c1a16] font-sans selection:bg-gold/30">
+    <div className="bg-bg-light text-neutral-dark font-sans selection:bg-gold/30">
       <Header activeTab="home" />
 
       <main className="pt-20">

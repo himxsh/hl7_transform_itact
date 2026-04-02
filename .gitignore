@@ -164,6 +164,8 @@ pnpm-debug.log*
 chat.md
 # Project-specific: user uploaded files
 /uploads/
+# Stateless processing temp directory
+/temp/
 plan.md
 audit_log.json
 presentation_guide.md

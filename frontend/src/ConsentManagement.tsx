@@ -49,7 +49,7 @@ export default function ConsentManagement() {
       return {
         ...c,
         granted: !c.granted,
-        timestamp: !c.granted ? new Date().toISOString().replace('T', ' ').slice(0, 19) + ' IST' : '—'
+        timestamp: !c.granted ? new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata', hour12: false }).replace(',', '') + ' IST' : '—'
       };
     }));
   };

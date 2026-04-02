@@ -6,7 +6,9 @@
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import LandingPage from './LandingPage';
 import DatabaseSelection from './DatabaseSelection';
+import BatchMode from './BatchMode';
 import Dashboard from './Dashboard';
+import SinglePatient from './SinglePatient';
 import Compliance from './Compliance';
 import Architecture from './Architecture';
 import LegalFramework from './LegalFramework';
@@ -29,7 +31,9 @@ import AccessControl from './AccessControl';
 const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
   { path: "/selection", element: <DatabaseSelection /> },
+  { path: "/batch", element: <BatchMode /> },
   { path: "/dashboard", element: <Dashboard /> },
+  { path: "/single-patient", element: <SinglePatient /> },
   { path: "/compliance", element: <Compliance /> },
   { path: "/architecture", element: <Architecture /> },
   { path: "/legal-framework", element: <LegalFramework /> },

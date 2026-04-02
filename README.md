@@ -111,7 +111,7 @@ MIMIC-IV CSVs ──► preprocess_mimic.py ──► merged DataFrame
       (post-hoc verification)    (React + Vite + FastAPI)
                                          │
                          ┌───────────────┴───────────────┐
-                         │   Security & Compliance Center  │
+                         │   Security & Compliance Center│
                          └───────────────────────────────┘
                                          │
                 ┌────────────┬───────────┼───────────┬────────────┐

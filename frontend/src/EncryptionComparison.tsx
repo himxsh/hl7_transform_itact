@@ -27,7 +27,7 @@ export const algorithmInfo = [
   { name: 'SHA3-256', type: 'Hash', bits: 256, standard: 'NIST FIPS 202', useCase: 'Future-proof Keccak-family hash', color: 'bg-purple-100 text-purple-700 border-purple-300' },
 ];
 
-export const EncryptionComparisonContent = ({ isModal = false }: { isModal?: boolean }) => {
+export const EncryptionComparisonContent = ({ isModal = false, runId }: { isModal?: boolean; runId?: string | null }) => {
   const [data, setData] = useState<RecordComparison[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,10 @@ export const EncryptionComparisonContent = ({ isModal = false }: { isModal?: boo
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/encryption-comparison');
+      const url = runId
+        ? `/api/encryption-comparison?run_id=${encodeURIComponent(runId)}`
+        : '/api/encryption-comparison';
+      const res = await fetch(url);
       const json = await res.json();
       setData(json.results || []);
     } catch (e) {
@@ -46,7 +49,7 @@ export const EncryptionComparisonContent = ({ isModal = false }: { isModal?: boo
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [runId]);
 
   const averages = data.length > 0 ? algorithmInfo.map((info) => {
     const allResults = data.flatMap(r => r.results.filter(a => a.name === info.name));
@@ -195,24 +198,44 @@ export const EncryptionComparisonContent = ({ isModal = false }: { isModal?: boo
           </div>
 
           <div className="border border-primary-gold/10 bg-white overflow-hidden">
-            <div className="grid grid-cols-12 gap-0 bg-primary-gold/5 border-b border-primary-gold/10 px-4 py-3">
-              <div className="col-span-2 font-mono text-[8px] uppercase tracking-widest text-primary-gold font-bold">Patient</div>
-              <div className="col-span-2 font-mono text-[8px] uppercase tracking-widest text-primary-gold font-bold text-center">SHA-256</div>
-              <div className="col-span-3 font-mono text-[8px] uppercase tracking-widest text-primary-gold font-bold text-center">AES-256-CBC</div>
-              <div className="col-span-3 font-mono text-[8px] uppercase tracking-widest text-primary-gold font-bold text-center">HMAC-SHA512</div>
-              <div className="col-span-2 font-mono text-[8px] uppercase tracking-widest text-primary-gold font-bold text-center">SHA3-256</div>
-            </div>
-            {data.map((record, idx) => (
-              <div key={record.subject_id} className={`grid grid-cols-12 gap-0 px-4 py-2 border-b border-primary-gold/5 ${idx % 2 === 0 ? '' : 'bg-primary-gold/[0.01]'}`}>
-                <div className="col-span-2 font-mono text-[10px] text-primary-gold font-bold">{record.subject_id}</div>
-                {record.results.map((r) => (
-                  <div key={r.name} className={`${r.name === 'AES-256-CBC' || r.name === 'HMAC-SHA512' ? 'col-span-3' : 'col-span-2'} text-center`}>
-                    <div className="font-mono text-[9px] text-neutral-dark/60">{r.time_ms.toFixed(3)}ms</div>
-                    <div className="font-mono text-[7px] text-neutral-dark/30 truncate px-1">{r.digest_preview}</div>
-                  </div>
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-primary-gold/5 border-b border-primary-gold/10">
+                <tr className="font-mono text-[8px] uppercase tracking-widest text-primary-gold font-bold">
+                  <th className="px-4 py-3 border-r border-primary-gold/5">Patient</th>
+                  {algorithmInfo.map(algo => (
+                    <th key={algo.name} className="px-4 py-3 text-center border-r last:border-r-0 border-primary-gold/5">
+                      {algo.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-primary-gold/5">
+                {data.map((record, idx) => (
+                  <tr key={record.subject_id} className={`${idx % 2 === 0 ? '' : 'bg-primary-gold/[0.01]'} hover:bg-primary-gold/[0.02] transition-colors`}>
+                    <td className="px-4 py-3 font-mono text-[10px] text-primary-gold font-bold border-r border-primary-gold/5">
+                      {record.subject_id}
+                    </td>
+                    {algorithmInfo.map(algo => {
+                      const result = record.results.find(r => r.name === algo.name);
+                      return (
+                        <td key={algo.name} className="px-4 py-3 text-center border-r last:border-r-0 border-primary-gold/5">
+                          {result ? (
+                            <>
+                              <div className="font-mono text-[9px] text-neutral-dark/60">{result.time_ms.toFixed(3)}ms</div>
+                              <div className="font-mono text-[7px] text-neutral-dark/30 truncate max-w-[80px] mx-auto" title={result.digest_preview}>
+                                {result.digest_preview}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-neutral-dark/20">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
                 ))}
-              </div>
-            ))}
+              </tbody>
+            </table>
           </div>
         </motion.section>
       )}
