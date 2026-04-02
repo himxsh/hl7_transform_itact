@@ -100,19 +100,15 @@ export default function Architecture() {
           {stages.map((stage, idx) => (
             <div key={stage.id} className="relative flex flex-col items-center w-full">
               {/* Stage Container */}
-              <div className={`flex w-full mb-4 px-4 ${idx % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
-                <motion.div
-                  initial={{ opacity: 0, x: idx % 2 === 0 ? -40 : 40 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.1, duration: 0.6 }}
+              <div className={`flex w-full mb-4 px-0 sm:px-4 justify-center ${idx % 2 === 0 ? 'lg:justify-start' : 'lg:justify-end'}`}>
+                <div
                   className={`w-full max-w-[440px] bg-white border p-10 rounded-[2.5rem] relative group transition-all duration-700
                     ${stage.type === 'addition'
-                      ? 'border-primary-gold shadow-[0_20px_60px_-20px_rgba(193,175,134,0.3)] ring-1 ring-primary-gold/10'
-                      : 'border-primary-gold/10 hover:border-primary-gold/30 hover:shadow-xl'}`}
+                      ? 'border-primary-gold'
+                      : 'border-primary-gold/10 hover:border-primary-gold/30'}`}
                 >
                   {stage.type === 'addition' && (
-                    <div className="absolute -top-3 right-10 bg-primary-gold text-[#1c1a16] font-mono text-[8px] px-4 py-1.5 rounded-full uppercase tracking-widest font-bold shadow-lg ring-4 ring-white">
+                    <div className="absolute -top-3 right-6 sm:right-10 bg-primary-gold text-neutral-dark font-mono text-[8px] px-4 py-1.5 rounded-full uppercase tracking-widest font-bold shadow-lg ring-4 ring-white dark:ring-[#171c22]">
                       Novelty
                     </div>
                   )}
@@ -124,15 +120,15 @@ export default function Architecture() {
                       {stage.icon}
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-title text-2xl text-black mb-1">{stage.title}</h3>
-                      <p className="font-sans text-[11px] text-black mb-4 leading-relaxed">{stage.description}</p>
+                      <h3 className="font-title text-2xl text-neutral-dark mb-1">{stage.title}</h3>
+                      <p className="font-sans text-[11px] text-neutral-dark/70 mb-4 leading-relaxed">{stage.description}</p>
 
                       <div className="flex flex-wrap gap-2">
                         {stage.items.map(item => (
                           <span key={item} className={`font-mono text-[8px] px-3 py-1 border rounded-full tracking-wide transition-all
                             ${stage.type === 'addition'
-                              ? 'border-primary-gold/30 text-black bg-primary-gold/5'
-                              : 'border-neutral-dark/10 text-black bg-neutral-dark/[0.02]'}`}
+                              ? 'border-primary-gold/30 text-neutral-dark bg-primary-gold/8'
+                              : 'border-neutral-dark/10 text-neutral-dark bg-neutral-dark/[0.04]'}`}
                           >
                             {item}
                           </span>
@@ -140,7 +136,7 @@ export default function Architecture() {
                       </div>
                     </div>
                   </div>
-                </motion.div>
+                </div>
               </div>
 
               {/* Cursive S-Curve Connector */}
@@ -151,55 +147,41 @@ export default function Architecture() {
 
         {/* Technical Summary */}
         <div className="mt-32 grid grid-cols-1 md:grid-cols-3 gap-8 w-full max-w-5xl">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1, duration: 0.5 }}
-            className="group relative bg-white border border-primary-gold/10 hover:border-primary-gold/40 p-10 rounded-[2.5rem] transition-all duration-500 hover:shadow-xl hover:-translate-y-2 overflow-hidden"
+          <div
+            className="group relative bg-white border border-primary-gold/10 hover:border-primary-gold/40 p-10 rounded-[2.5rem] transition-all duration-500 hover:-translate-y-2 overflow-hidden"
           >
             <div className="w-12 h-12 rounded-[1rem] bg-bg-light border border-primary-gold/10 flex items-center justify-center mb-6 group-hover:bg-primary-gold/10 group-hover:border-primary-gold/30 transition-all duration-500">
               <Cpu className="text-primary-gold" strokeWidth={1.5} size={22} />
             </div>
-            <h4 className="font-title text-xl mb-3 text-black">Original Logic</h4>
-            <p className="font-sans text-[13px] text-black leading-relaxed">
+            <h4 className="font-title text-xl mb-3 text-neutral-dark">Original Logic</h4>
+            <p className="font-sans text-[13px] text-neutral-dark/70 leading-relaxed">
               Based on core Python transformation scripts handling CSV grouping and HL7 serialization.
             </p>
-          </motion.div>
+          </div>
 
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.2, duration: 0.5 }}
-            className="group relative bg-white border border-primary-gold shadow-[0_20px_60px_-20px_rgba(193,175,134,0.3)] ring-1 ring-primary-gold/10 p-10 rounded-[2.5rem] transition-all duration-500 hover:-translate-y-2 overflow-hidden"
+          <div
+            className="group relative bg-white border border-primary-gold p-10 rounded-[2.5rem] transition-all duration-500 hover:-translate-y-2 overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-48 h-48 bg-primary-gold/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-primary-gold/20 transition-colors duration-700" />
             <div className="w-12 h-12 rounded-[1rem] bg-primary-gold/10 border border-primary-gold/30 flex items-center justify-center mb-6 rotate-3 group-hover:rotate-12 transition-transform duration-500 relative z-10">
               <ShieldCheck className="text-primary-gold" strokeWidth={1.5} size={22} />
             </div>
-            <h4 className="font-title text-xl mb-3 text-black relative z-10">Privacy Layer</h4>
-            <p className="font-sans text-[13px] text-black leading-relaxed relative z-10">
+            <h4 className="font-title text-xl mb-3 text-neutral-dark relative z-10">Privacy Layer</h4>
+            <p className="font-sans text-[13px] text-neutral-dark/70 leading-relaxed relative z-10">
               Security middleware inserted between ingestion and transformation for DPDP compliance.
             </p>
-          </motion.div>
+          </div>
 
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.3, duration: 0.5 }}
-            className="group relative bg-white border border-primary-gold shadow-[0_20px_60px_-20px_rgba(193,175,134,0.3)] ring-1 ring-primary-gold/10 p-10 rounded-[2.5rem] transition-all duration-500 hover:-translate-y-2 overflow-hidden"
+          <div
+            className="group relative bg-white border border-primary-gold p-10 rounded-[2.5rem] transition-all duration-500 hover:-translate-y-2 overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-48 h-48 bg-primary-gold/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-primary-gold/20 transition-colors duration-700" />
             <div className="w-12 h-12 rounded-[1rem] bg-primary-gold/10 border border-primary-gold/30 flex items-center justify-center mb-6 rotate-3 group-hover:rotate-12 transition-transform duration-500 relative z-10">
               <Binary className="text-primary-gold" strokeWidth={1.5} size={22} />
             </div>
-            <h4 className="font-title text-xl mb-3 text-black relative z-10">Security Audit</h4>
-            <p className="font-sans text-[13px] text-black leading-relaxed relative z-10">
+            <h4 className="font-title text-xl mb-3 text-neutral-dark relative z-10">Security Audit</h4>
+            <p className="font-sans text-[13px] text-neutral-dark/70 leading-relaxed relative z-10">
               Automated checksum and integrity verification for every processed clinical message.
             </p>
-          </motion.div>
+          </div>
         </div>
       </main>
       <Footer />
@@ -222,27 +204,53 @@ function Connector({ idx }: { idx: number }) {
 
   return (
     <div ref={ref} className="h-32 w-full relative -mt-6 -mb-6 pointer-events-none">
-      <svg width="100%" height="100%" viewBox="0 0 1000 120" fill="none" preserveAspectRatio="none" className="overflow-visible">
-        <path
-          d={pathD}
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeDasharray="10 10"
-          className="text-primary-gold"
-          style={{ opacity: 0.15 }}
-        />
-        <motion.path
-          d={pathD}
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeDasharray="10 10"
-          className="text-primary-gold"
-          style={{ pathLength: scrollYProgress, opacity: 1 }}
-        />
-      </svg>
-      <motion.div style={{ opacity: arrowOpacity }} className={`absolute bottom-0 ${idx % 2 === 0 ? 'right-[22%]' : 'left-[22%]'} -mb-4 text-primary-gold`}>
-        <ArrowRight className="rotate-90 scale-125" />
-      </motion.div>
+      <div className="block lg:hidden h-full w-full relative">
+        <svg width="100%" height="100%" viewBox="0 0 100 120" fill="none" preserveAspectRatio="none" className="overflow-visible">
+          <path
+            d="M 50 0 L 50 120"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeDasharray="10 10"
+            className="text-primary-gold"
+            style={{ opacity: 0.15 }}
+          />
+          <motion.path
+            d="M 50 0 L 50 120"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeDasharray="10 10"
+            className="text-primary-gold"
+            style={{ pathLength: scrollYProgress, opacity: 1 }}
+          />
+        </svg>
+        <motion.div style={{ opacity: arrowOpacity }} className="absolute bottom-0 left-1/2 -translate-x-1/2 -mb-4 text-primary-gold">
+          <ArrowRight className="rotate-90 scale-125" />
+        </motion.div>
+      </div>
+
+      <div className="hidden lg:block h-full w-full relative">
+        <svg width="100%" height="100%" viewBox="0 0 1000 120" fill="none" preserveAspectRatio="none" className="overflow-visible">
+          <path
+            d={pathD}
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeDasharray="10 10"
+            className="text-primary-gold"
+            style={{ opacity: 0.15 }}
+          />
+          <motion.path
+            d={pathD}
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeDasharray="10 10"
+            className="text-primary-gold"
+            style={{ pathLength: scrollYProgress, opacity: 1 }}
+          />
+        </svg>
+        <motion.div style={{ opacity: arrowOpacity }} className={`absolute bottom-0 ${idx % 2 === 0 ? 'right-[22%]' : 'left-[22%]'} -mb-4 text-primary-gold`}>
+          <ArrowRight className="rotate-90 scale-125" />
+        </motion.div>
+      </div>
     </div>
   );
 }

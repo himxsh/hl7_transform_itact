@@ -263,24 +263,24 @@ export default function BatchMode() {
                       onClick={() => !isUploading && mimicInputRefs.current[mf.key]?.click()}
                       className={`flex items-center justify-between p-4 border border-dashed rounded-sm cursor-pointer transition-all ${
                         uploaded
-                          ? 'border-green-300 bg-green-50/50'
-                          : 'border-primary-gold/20 hover:border-primary-gold/50 hover:bg-primary-gold/5'
+                          ? 'border-green-500/60 bg-green-500/12 hover:bg-green-500/16'
+                          : 'border-primary-gold/25 hover:border-primary-gold/60 hover:bg-primary-gold/8'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         {isUploading ? (
                           <Loader2 size={16} className="animate-spin text-primary-gold" />
                         ) : uploaded ? (
-                          <CheckCircle2 size={16} className="text-green-500" />
+                          <CheckCircle2 size={16} className="text-green-600 dark:text-green-400" />
                         ) : (
-                          <UploadCloud size={16} className="text-primary-gold/50" />
+                          <UploadCloud size={16} className="text-primary-gold/70" />
                         )}
                         <div>
-                          <div className="text-sm font-mono text-neutral-dark/80">{mf.name}</div>
-                          <div className="text-[9px] text-neutral-dark/40">{mf.description}</div>
+                          <div className={`text-sm font-mono ${uploaded ? 'text-neutral-dark dark:text-white' : 'text-neutral-dark/85 dark:text-white/90'}`}>{mf.name}</div>
+                          <div className={`text-[9px] ${uploaded ? 'text-neutral-dark/70 dark:text-white/65' : 'text-neutral-dark/45 dark:text-white/45'}`}>{mf.description}</div>
                         </div>
                       </div>
-                      <span className="text-[9px] font-mono uppercase text-neutral-dark/30">
+                      <span className={`text-[9px] font-mono uppercase ${uploaded ? 'text-green-700 dark:text-green-300' : 'text-neutral-dark/40 dark:text-white/45'}`}>
                         {isUploading ? 'Uploading...' : uploaded ? '✓ Ready' : 'Click to upload'}
                       </span>
                       <input
@@ -309,18 +309,18 @@ export default function BatchMode() {
                   onClick={() => genericInputRef.current?.click()}
                   className={`p-10 border border-dashed rounded-sm flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
                     genericUpload
-                      ? 'border-green-300 bg-green-50/50'
-                      : 'border-primary-gold/20 hover:border-primary-gold/50 hover:bg-primary-gold/5'
+                      ? 'border-green-500/60 bg-green-500/12 hover:bg-green-500/16'
+                      : 'border-primary-gold/25 hover:border-primary-gold/60 hover:bg-primary-gold/8'
                   }`}
                 >
                   {uploading === 'generic' ? (
                     <Loader2 className="animate-spin text-primary-gold mb-2" size={24} />
                   ) : genericUpload ? (
-                    <CheckCircle2 className="text-green-500 mb-2" size={24} />
+                    <CheckCircle2 className="text-green-600 dark:text-green-400 mb-2" size={24} />
                   ) : (
-                    <UploadCloud className="text-primary-gold/50 mb-2" size={24} />
+                    <UploadCloud className="text-primary-gold/70 mb-2" size={24} />
                   )}
-                  <p className="font-mono text-[10px] text-neutral-dark/50">
+                  <p className={`font-mono text-[10px] ${genericUpload ? 'text-neutral-dark/85 dark:text-white/85' : 'text-neutral-dark/55 dark:text-white/55'}`}>
                     {uploading === 'generic'
                       ? 'Uploading...'
                       : genericUpload
@@ -329,7 +329,7 @@ export default function BatchMode() {
                     }
                   </p>
                   {genericUpload && (
-                    <span className="text-[9px] text-primary-gold mt-1 underline">Change file</span>
+                    <span className="text-[9px] text-primary-gold mt-1 underline underline-offset-2">Change file</span>
                   )}
                 </div>
                 <input
@@ -348,8 +348,8 @@ export default function BatchMode() {
               disabled={!isReady}
               className={`w-full mt-8 py-5 rounded-sm text-xs font-sans uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all group ${
                 isReady
-                  ? 'bg-neutral-dark text-white hover:bg-neutral-dark/90 cursor-pointer'
-                  : 'bg-neutral-dark/20 text-white/50 cursor-not-allowed'
+                  ? 'bg-primary-gold text-charcoal border border-primary-gold shadow-[0_10px_30px_-18px_rgba(166,145,101,0.9)] hover:bg-primary-gold/90 cursor-pointer'
+                  : 'bg-neutral-dark/15 text-neutral-dark/35 dark:text-white/35 cursor-not-allowed border border-primary-gold/10'
               }`}
             >
               <span>Run Pipeline</span>

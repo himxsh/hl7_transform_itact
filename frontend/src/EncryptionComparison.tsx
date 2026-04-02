@@ -27,7 +27,7 @@ export const algorithmInfo = [
   { name: 'SHA3-256', type: 'Hash', bits: 256, standard: 'NIST FIPS 202', useCase: 'Future-proof Keccak-family hash', color: 'bg-purple-100 text-purple-700 border-purple-300' },
 ];
 
-export const EncryptionComparisonContent = ({ isModal = false }: { isModal?: boolean }) => {
+export const EncryptionComparisonContent = ({ isModal = false, runId }: { isModal?: boolean; runId?: string | null }) => {
   const [data, setData] = useState<RecordComparison[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,10 @@ export const EncryptionComparisonContent = ({ isModal = false }: { isModal?: boo
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/encryption-comparison');
+      const url = runId
+        ? `/api/encryption-comparison?run_id=${encodeURIComponent(runId)}`
+        : '/api/encryption-comparison';
+      const res = await fetch(url);
       const json = await res.json();
       setData(json.results || []);
     } catch (e) {
@@ -46,7 +49,7 @@ export const EncryptionComparisonContent = ({ isModal = false }: { isModal?: boo
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [runId]);
 
   const averages = data.length > 0 ? algorithmInfo.map((info) => {
     const allResults = data.flatMap(r => r.results.filter(a => a.name === info.name));

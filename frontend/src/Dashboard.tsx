@@ -9,12 +9,15 @@ import {
   ChevronRight,
   Terminal,
   Settings,
-  Download
+  Download,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useLocation, useBlocker } from 'react-router-dom';
 import SecurityModal from './SecurityModal';
 import Footer from './Footer';
+import { getStoredTheme, toggleTheme, type ThemeMode } from './theme';
 
 // --- Types ---
 interface PatientRecord {
@@ -31,17 +34,17 @@ interface PatientRecord {
 
 // --- Sub-components ---
 const StatCard: React.FC<{ label: string, value: string | number, subValue?: string, color?: string }> = ({ label, value, subValue, color = 'text-white' }) => (
-  <div className="glass-panel p-5 border-l-2 border-l-gold">
+  <div className="glass-panel p-4 sm:p-5 border-l-2 border-l-gold">
     <div className="text-white/40 text-[10px] uppercase tracking-[0.15em] mb-2 font-sans">{label}</div>
-    <div className="flex items-baseline space-x-2">
-      <div className={`text-3xl technical-data ${color}`}>{value}</div>
+    <div className="flex items-baseline gap-2">
+      <div className={`text-2xl sm:text-3xl technical-data ${color}`}>{value}</div>
       {subValue && <div className="text-white/20 text-sm technical-data">/ {subValue}</div>}
     </div>
   </div>
 );
 
 const PipelineStage = ({ label, active, completed }: { label: string, active: boolean, completed: boolean }) => (
-  <div className="flex flex-col items-center space-y-3 bg-charcoal px-4 relative z-10">
+  <div className="flex min-w-[120px] sm:min-w-0 flex-col items-center space-y-3 bg-charcoal px-3 sm:px-4 relative z-10">
     <div className={`w-4 h-4 rounded-full border-4 border-charcoal-light transition-all duration-500 ${completed
         ? 'bg-ok-green shadow-[0_0_15px_rgba(106,158,114,0.6)]'
         : active
@@ -64,11 +67,11 @@ const LogEntry: React.FC<LogEntryProps> = ({ time, file, status, warning = false
   <motion.div
     initial={{ opacity: 0, x: -10 }}
     animate={{ opacity: 1, x: 0 }}
-    className="grid grid-cols-12 gap-2 border-b border-ui-border/10 pb-2.5 items-center"
+    className="grid grid-cols-1 gap-1 border-b border-ui-border/10 pb-2.5 items-start sm:grid-cols-12 sm:gap-2 sm:items-center"
   >
-    <div className="col-span-3 text-white/30 font-mono">[{time}]</div>
-    <div className="col-span-6 text-white/70 truncate">{file}</div>
-    <div className="col-span-3 flex items-center justify-end space-x-2">
+    <div className="text-white/30 font-mono sm:col-span-3">[{time}]</div>
+    <div className="text-white/70 truncate sm:col-span-6">{file}</div>
+    <div className="flex items-center gap-2 sm:col-span-3 sm:justify-end">
       <span className={warning ? 'text-warn-amber' : 'text-ok-green'}>{status}</span>
       <div className={`w-1 h-1 rounded-full ${warning ? 'bg-warn-amber' : 'bg-ok-green'} animate-pulse`} />
     </div>
@@ -78,7 +81,7 @@ const LogEntry: React.FC<LogEntryProps> = ({ time, file, status, warning = false
 const ConfigItem = ({ label, value }: { label: string, value: string }) => (
   <div>
     <div className="text-white/30 uppercase tracking-wider mb-1.5 text-[9px]">/ {label}</div>
-    <div className="text-white/80">{value}</div>
+    <div className="text-white/80 break-words">{value}</div>
   </div>
 );
 
@@ -106,6 +109,8 @@ export default function Dashboard() {
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [downloadToken, setDownloadToken] = useState<string | null>(null);
+  const [encryptionRunId, setEncryptionRunId] = useState<string | null>(locState.runId || null);
+  const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme());
   const logContainerRef = useRef<HTMLDivElement>(null);
   const headersInitialized = useRef(false);
   const hasRunRef = useRef(false);
@@ -122,6 +127,16 @@ export default function Dashboard() {
       setShowExitWarning(true);
     }
   }, [blocker.state]);
+
+  useEffect(() => {
+    const syncTheme = (event: Event) => {
+      const nextTheme = (event as CustomEvent<ThemeMode>).detail || getStoredTheme();
+      setTheme(nextTheme);
+    };
+
+    window.addEventListener('theme-change', syncTheme);
+    return () => window.removeEventListener('theme-change', syncTheme);
+  }, []);
 
   // Warning for browser refresh / close button
   useEffect(() => {
@@ -142,6 +157,7 @@ export default function Dashboard() {
     setRecords([]);
     setTableHeaders([]);
     setErrorMessage('');
+    setEncryptionRunId(locState.runId || null);
     headersInitialized.current = false;
     setCurrentStage(0);
 
@@ -242,6 +258,7 @@ export default function Dashboard() {
           } else if (data.status === 'success') {
             setCurrentStage(4);
             if (data.downloadToken) setDownloadToken(data.downloadToken);
+            if (data.runId) setEncryptionRunId(data.runId);
           } else if (data.status === 'error') {
             throw new Error(data.message || 'Pipeline failed');
           }
@@ -307,34 +324,35 @@ export default function Dashboard() {
   return (
     <div className="flex min-h-screen bg-charcoal text-[#e2e2e2] font-sans">
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-ui-border flex items-center justify-between px-8 bg-charcoal/80 backdrop-blur-md sticky top-0 z-30">
-          <div className="flex items-center space-x-4">
+        <header className="border-b border-ui-border bg-charcoal/80 backdrop-blur-md sticky top-0 z-30">
+          <div className="flex flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8 lg:h-16 lg:flex-row lg:items-center lg:justify-between lg:py-0">
+          <div className="flex min-w-0 items-center space-x-3 sm:space-x-4">
             <button
               onClick={() => navigate('/selection')}
               className="p-2 hover:bg-white/5 rounded-full transition-colors text-white/50 hover:text-gold group"
             >
               <ChevronRight className="rotate-180" size={20} />
             </button>
-            <div className="flex flex-col">
+            <div className="flex min-w-0 flex-col">
               <div className="text-[10px] uppercase text-white/40 tracking-[0.2em]">HL7 Orchestrator</div>
-              <h2 className="text-xl font-title text-white">Live Pipeline Status</h2>
+              <h2 className="text-lg sm:text-xl font-title text-white truncate">Live Pipeline Status</h2>
             </div>
           </div>
 
-          <div className="flex items-center space-x-6">
-            <div className="flex flex-col items-end">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between lg:justify-end lg:gap-6">
+            <div className="flex flex-col items-start sm:items-end">
               {currentStage === 4 ? (
-                <div className="flex items-center gap-2 mb-1">
+                <div className="mb-1 flex flex-col gap-2 sm:flex-row sm:items-center">
                   <button
                     onClick={downloadAllHL7}
-                    className="px-3 py-1 border border-gold/40 text-gold text-[10px] font-bold uppercase tracking-tight rounded hover:bg-gold hover:text-charcoal transition-all flex items-center gap-2"
+                    className="px-3 py-2 border border-gold/40 text-gold text-[10px] font-bold uppercase tracking-tight rounded hover:bg-gold hover:text-charcoal transition-all flex items-center justify-center gap-2"
                   >
                     <Download size={12} />
                     Download HL7 ZIP
                   </button>
                   <button
                     onClick={() => setIsSecurityModalOpen(true)}
-                    className="px-3 py-1 bg-ok-green text-charcoal border border-ok-green/50 text-[10px] font-bold uppercase tracking-tight rounded hover:bg-white hover:border-white transition-all shadow-[0_0_15px_rgba(106,158,114,0.4)]"
+                    className="px-3 py-2 bg-ok-green text-charcoal border border-ok-green/50 text-[10px] font-bold uppercase tracking-tight rounded hover:bg-white hover:border-white transition-all shadow-[0_0_15px_rgba(106,158,114,0.4)]"
                   >
                     Orchestration Complete → View Audit
                   </button>
@@ -346,7 +364,7 @@ export default function Dashboard() {
               ) : records.length > 0 ? (
                 <button
                   onClick={downloadAllHL7}
-                  className="px-3 py-1 border border-gold/40 text-gold text-[10px] font-bold uppercase tracking-tight mb-1 rounded hover:bg-gold hover:text-charcoal transition-all flex items-center gap-2"
+                  className="mb-1 px-3 py-2 border border-gold/40 text-gold text-[10px] font-bold uppercase tracking-tight rounded hover:bg-gold hover:text-charcoal transition-all flex items-center justify-center gap-2"
                 >
                   <Download size={12} />
                   Download HL7 ZIP
@@ -354,10 +372,20 @@ export default function Dashboard() {
               ) : null}
               <span className="text-[10px] technical-data text-white/40">{selectedDataset}</span>
             </div>
+            <button
+              type="button"
+              onClick={() => setTheme(toggleTheme(theme))}
+              className="inline-flex items-center justify-center self-start sm:self-auto p-2 border border-gold/20 text-gold rounded-full hover:bg-gold/10 transition-colors"
+              aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+          </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-8 space-y-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 sm:space-y-8">
           {/* Ephemeral session banner */}
           <div className="flex items-center gap-2 px-4 py-2.5 bg-warn-amber/10 border border-warn-amber/20 rounded">
             <ShieldAlert size={14} className="text-warn-amber shrink-0" />
@@ -365,7 +393,7 @@ export default function Dashboard() {
               Stateless session — Your files are processed in-memory and deleted after download
             </span>
           </div>
-          <section className="grid grid-cols-4 gap-6">
+          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 sm:gap-6">
             <StatCard label="Records Processed" value={records.length} />
             <StatCard label="HL7 Files Generated" value={records.length} />
             <StatCard label="Integrity Seals Valid" value={records.length} subValue={records.length.toString()} color="text-ok-green" />
@@ -379,19 +407,21 @@ export default function Dashboard() {
             </section>
           )}
 
-          <section className="glass-panel p-8 relative overflow-hidden">
-            <h3 className="text-gold uppercase tracking-[0.2em] text-[11px] mb-10">Current Orchestration Flow</h3>
-            <div className="flex items-center justify-between relative px-12">
-              <div className="absolute top-[8px] left-24 right-24 h-px bg-ui-border"></div>
+          <section className="glass-panel p-5 sm:p-8 relative overflow-hidden">
+            <h3 className="text-gold uppercase tracking-[0.2em] text-[11px] mb-6 sm:mb-10">Current Orchestration Flow</h3>
+            <div className="relative overflow-x-auto pb-2">
+              <div className="flex min-w-max items-center justify-between gap-2 sm:gap-0 relative px-2 sm:px-12">
+              <div className="absolute top-[8px] left-14 right-14 sm:left-24 sm:right-24 h-px bg-ui-border"></div>
               <PipelineStage label="Preprocessing" active={currentStage === 0} completed={currentStage > 0} />
               <PipelineStage label="Anonymizer" active={currentStage === 1} completed={currentStage > 1} />
               <PipelineStage label="HL7 Transform" active={currentStage === 2} completed={currentStage > 2} />
               <PipelineStage label="Integrity Seal" active={currentStage === 3} completed={currentStage > 3} />
+              </div>
             </div>
           </section>
 
-          <div className="grid grid-cols-12 gap-8">
-            <section className="col-span-12 glass-panel overflow-hidden flex flex-col">
+          <div className="grid grid-cols-1 gap-6 lg:gap-8">
+            <section className="glass-panel overflow-hidden flex flex-col">
               <div className="p-4 border-b border-ui-border flex justify-between items-center bg-charcoal-light/30">
                 <h3 className="text-gold uppercase tracking-[0.2em] text-[11px]">Primary Record Stream</h3>
               </div>
@@ -443,15 +473,15 @@ export default function Dashboard() {
             </section>
           </div>
 
-          <div className="grid grid-cols-12 gap-8">
-            <section className="col-span-7 glass-panel flex flex-col">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
+            <section className="xl:col-span-7 glass-panel flex flex-col min-w-0">
               <div className="p-4 border-b border-ui-border flex justify-between items-center bg-charcoal-light/20">
                 <div className="flex items-center space-x-2">
                   <Terminal size={14} className="text-gold" />
-                  <h3 className="text-gold uppercase tracking-[0.2em] text-[11px]">HL7 Inspect — {activeFile || 'None Selected'}</h3>
+                  <h3 className="text-gold uppercase tracking-[0.2em] text-[11px] truncate">HL7 Inspect — {activeFile || 'None Selected'}</h3>
                 </div>
               </div>
-              <div className="flex-1 p-6 technical-data text-[11px] leading-relaxed overflow-x-auto bg-black/20 min-h-[200px]">
+              <div className="flex-1 p-4 sm:p-6 technical-data text-[11px] leading-relaxed overflow-x-auto bg-black/20 min-h-[200px]">
                 {hl7Content ? hl7Content.split('\n').map((line, i) => (
                   <div key={i} className="text-white/60 mb-1.5 whitespace-pre">
                     <span className="text-gold/40 mr-4">{(i + 1).toString().padStart(2, '0')}</span>
@@ -461,13 +491,13 @@ export default function Dashboard() {
               </div>
             </section>
 
-            <div className="col-span-5 space-y-8">
+            <div className="xl:col-span-5 space-y-6 lg:space-y-8">
               <section className="glass-panel p-6">
                 <div className="flex items-center space-x-2 mb-5">
                   <ShieldAlert size={14} className="text-gold" />
                   <h3 className="text-gold uppercase tracking-[0.2em] text-[11px]">Integrity Validation Log (IST)</h3>
                 </div>
-                <div className="grid grid-cols-12 gap-2 mb-2 px-1 text-white/20 font-mono text-[7px] uppercase tracking-widest border-b border-white/5 pb-1">
+                <div className="hidden sm:grid grid-cols-12 gap-2 mb-2 px-1 text-white/20 font-mono text-[7px] uppercase tracking-widest border-b border-white/5 pb-1">
                   <div className="col-span-3">Time</div>
                   <div className="col-span-6 text-center">Record File</div>
                   <div className="col-span-3 text-right">Status</div>
@@ -505,7 +535,7 @@ export default function Dashboard() {
                   <Settings size={14} className="text-gold" />
                   <h3 className="text-gold uppercase tracking-[0.2em] text-[11px]">Orchestration Config</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-x-8 gap-y-5 technical-data text-[10px]">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-5 technical-data text-[10px]">
                   <ConfigItem label="Execution Mode" value="Batch / Stateless" />
                   <ConfigItem label="Input Source" value={selectedDataset} />
                   <ConfigItem label="Anonymization" value="Mapping: Indo-Surnames" />
@@ -515,7 +545,7 @@ export default function Dashboard() {
             </div>
           </div>
           
-          <div className="-mx-8 -mb-8 mt-16">
+          <div className="-mx-4 sm:-mx-6 lg:-mx-8 -mb-4 sm:-mb-6 lg:-mb-8 mt-12 sm:mt-16">
             <Footer />
           </div>
         </main>
@@ -524,6 +554,7 @@ export default function Dashboard() {
       <SecurityModal 
         isOpen={isSecurityModalOpen} 
         onClose={() => setIsSecurityModalOpen(false)} 
+        runId={encryptionRunId}
       />
 
       <AnimatePresence>

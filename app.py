@@ -1,17 +1,23 @@
+import asyncio
+import io
+import json
+import logging
+import os
+import shutil
+import time
+import uuid
+import zipfile
+from dataclasses import asdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import pandas as pd
 from fastapi import FastAPI, HTTPException, UploadFile, File, Header as FastAPIHeader
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Dict
-import os
-import uuid
-import shutil
-import tempfile
-import logging
-import time
-import threading
-from pathlib import Path
 from pipelines.mimic_pipeline import build_hl7_message
 from pipelines.generic_pipeline import run_generic_pipeline
 from hl7_transform.anonymizer import Anonymizer
@@ -24,12 +30,6 @@ from hl7_transform.data_lineage import DataLineageTracker
 from hl7_transform.risk_assessment import RiskAssessor
 from hl7_transform.access_control import AccessControlSimulator
 from preprocess_mimic import preprocess
-import pandas as pd
-import json
-from dataclasses import asdict
-from datetime import datetime, timezone
-import io
-import zipfile
 
 app = FastAPI()
 logger = logging.getLogger("hl7_pipeline.app")
@@ -77,9 +77,38 @@ def _cleanup_expired_downloads():
 
 
 # ---------------------------------------------------------------------------
-# Short-lived encryption store (holds latest run for the demo UI)
+# Short-lived encryption results store keyed by run ID
 # ---------------------------------------------------------------------------
-_latest_encryption_results = []
+_encryption_results_store: Dict[str, dict] = {}  # run_id → {"results": list, "created": float}
+
+
+def _normalize_run_id(raw_run_id: str) -> str:
+    """Validate run IDs before using them in filesystem paths."""
+    try:
+        return str(uuid.UUID(raw_run_id))
+    except (ValueError, TypeError, AttributeError):
+        raise HTTPException(status_code=404, detail="Run directory not found.")
+
+
+def _get_run_dir(raw_run_id: str, *, must_exist: bool = True) -> Tuple[str, Path]:
+    """Return a validated temp run directory under TEMP_ROOT only."""
+    run_id = _normalize_run_id(raw_run_id)
+    run_dir = (TEMP_ROOT / run_id).resolve()
+    if run_dir.parent != TEMP_ROOT.resolve():
+        raise HTTPException(status_code=404, detail="Run directory not found.")
+    if must_exist and not run_dir.exists():
+        raise HTTPException(status_code=404, detail="Run directory not found.")
+    return run_id, run_dir
+
+
+def _store_encryption_results(run_id: str, results: list) -> None:
+    """Persist run-scoped encryption results for short-lived UI lookups."""
+    _cleanup_expired_downloads()
+    _encryption_results_store[run_id] = {"results": results, "created": time.time()}
+    now = time.time()
+    expired = [k for k, v in _encryption_results_store.items() if now - v["created"] > _DOWNLOAD_TTL_SECONDS]
+    for k in expired:
+        del _encryption_results_store[k]
 
 
 # ---------------------------------------------------------------------------
@@ -130,7 +159,6 @@ async def get_datasets():
 # ---------------------------------------------------------------------------
 # File Upload — Stateless (saved to temp/{uuid}/)
 # ---------------------------------------------------------------------------
-import asyncio
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):
@@ -199,9 +227,7 @@ async def upload_file_to_run(run_id: str, file: UploadFile = File(...)):
     if not safe_name:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    run_dir = TEMP_ROOT / run_id
-    if not run_dir.exists():
-        raise HTTPException(status_code=404, detail="Run ID not found. Upload the first file to create a session.")
+    run_id, run_dir = _get_run_dir(run_id)
 
     file_path = run_dir / safe_name
     file_path.write_bytes(contents)
@@ -227,16 +253,13 @@ async def run_pipeline(config: RunConfig):
 
     [IT Act §67C] — Record preservation during processing.
     """
-    run_dir = TEMP_ROOT / config.runId
-    if not run_dir.exists():
-        raise HTTPException(status_code=404, detail="Run directory not found. Please upload files first.")
+    run_id, run_dir = _get_run_dir(config.runId)
 
     # Create output subdir within the run's temp dir
     out_dir = run_dir / "output"
     out_dir.mkdir(parents=True, exist_ok=True)
 
     async def event_generator():
-        global _latest_encryption_results
         try:
             if config.dataset.lower().startswith("mimic"):
                 # -------------------------------------------------------
@@ -244,7 +267,7 @@ async def run_pipeline(config: RunConfig):
                 # -------------------------------------------------------
                 audit_logger.log(
                     event_type="PIPELINE_START",
-                    details={"dataset": config.dataset, "mode": "batch_mimic", "run_id": config.runId},
+                    details={"dataset": config.dataset, "mode": "batch_mimic", "run_id": run_id},
                     legal_reference="IT Act §67C (Record preservation)",
                     severity="INFO",
                 )
@@ -351,14 +374,14 @@ async def run_pipeline(config: RunConfig):
 
                 audit_logger.log(
                     event_type="PIPELINE_END",
-                    details={"total_records": total, "run_id": config.runId},
+                    details={"total_records": total, "run_id": run_id},
                     legal_reference="IT Act §67C (Record preservation)",
                     severity="INFO",
                 )
 
-                _latest_encryption_results = all_encryption_results
+                _store_encryption_results(run_id, all_encryption_results)
 
-                yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully', 'downloadToken': download_token, 'encryptionResults': all_encryption_results})}\n\n"
+                yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully', 'downloadToken': download_token, 'encryptionResults': all_encryption_results, 'runId': run_id})}\n\n"
 
             elif config.dataset.lower().startswith("liver") or \
                  config.dataset.lower().startswith("generalized") or \
@@ -481,9 +504,9 @@ async def run_pipeline(config: RunConfig):
 
                 download_token = _build_and_store_zip(out_dir)
 
-                _latest_encryption_results = all_encryption_results
+                _store_encryption_results(run_id, all_encryption_results)
 
-                yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully', 'downloadToken': download_token, 'encryptionResults': all_encryption_results})}\n\n"
+                yield f"data: {json.dumps({'status': 'success', 'message': f'Processed {total} records successfully', 'downloadToken': download_token, 'encryptionResults': all_encryption_results, 'runId': run_id})}\n\n"
             else:
                 yield f"data: {json.dumps({'status': 'error', 'message': 'Unsupported dataset'})}\n\n"
 
@@ -503,7 +526,7 @@ async def run_pipeline(config: RunConfig):
                 logger.info("[Stateless] Cleaned up temp dir: %s", run_dir)
                 audit_logger.log(
                     event_type="DATA_PURGED",
-                    details={"run_id": config.runId, "path": str(run_dir)},
+                    details={"run_id": run_id, "path": str(run_dir)},
                     legal_reference="DPDP §8(7) (Data minimisation — immediate deletion)",
                     severity="INFO",
                 )
@@ -567,8 +590,8 @@ async def run_single_patient(request: SinglePatientRequest):
     [IT Act §14]  — Secure Electronic Record via SHA-256 signing.
     """
     def generate():
-        global _latest_encryption_results
         try:
+            run_id = str(uuid.uuid4())
             # Stage 0: Preprocessing
             yield f"data: {json.dumps({'status': 'progress', 'stage': 0, 'message': 'Validating patient fields...'})}\n\n"
             time.sleep(0.3)
@@ -670,10 +693,10 @@ async def run_single_patient(request: SinglePatientRequest):
             token = str(uuid.uuid4())
             _download_store[token] = {"data": zip_buf.getvalue(), "created": time.time()}
 
-            _latest_encryption_results = [{"subject_id": str(subject_id), "results": enc_dicts}]
+            _store_encryption_results(run_id, [{"subject_id": str(subject_id), "results": enc_dicts}])
 
             # Stage 4: Success
-            yield f"data: {json.dumps({'status': 'success', 'message': 'Processed 1 record successfully', 'downloadToken': token, 'encryptionResults': enc_dicts})}\n\n"
+            yield f"data: {json.dumps({'status': 'success', 'message': 'Processed 1 record successfully', 'downloadToken': token, 'encryptionResults': enc_dicts, 'runId': run_id})}\n\n"
 
         except Exception as e:
             logger.error("Single patient pipeline error: %s", str(e), exc_info=True)
@@ -807,11 +830,14 @@ async def get_logs():
 
 
 @app.get("/api/encryption-comparison")
-async def get_encryption_comparison():
+async def get_encryption_comparison(run_id: Optional[str] = None):
     """Return encryption comparison algorithms info."""
-    global _latest_encryption_results
+    results = []
+    if run_id:
+        normalized_run_id = _normalize_run_id(run_id)
+        results = _encryption_results_store.get(normalized_run_id, {}).get("results", [])
     return {
-        "results": _latest_encryption_results,
+        "results": results,
         "algorithms": ["SHA-256", "AES-256-CBC", "HMAC-SHA512", "SHA3-256"],
     }
 

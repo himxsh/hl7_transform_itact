@@ -36,8 +36,8 @@ const eventIcons: Record<string, string> = {
   PIPELINE_END: '🏁',
 };
 
-const TABS = [
-  { id: 'encryption', label: 'Encryption', component: () => <EncryptionComparisonContent isModal={true} /> },
+const TABS = (runId?: string | null) => [
+  { id: 'encryption', label: 'Encryption', component: () => <EncryptionComparisonContent isModal={true} runId={runId} /> },
   { id: 'audit', label: 'Audit Log', component: () => <AuditLogContent isModal={true} /> },
   { id: 'breach', label: 'Breach Detection', component: () => <BreachDetectionContent isModal={true} /> },
   { id: 'compliance', label: 'Compliance', component: () => <ComplianceScoreContent isModal={true} /> },
@@ -46,8 +46,9 @@ const TABS = [
   { id: 'access', label: 'Access Control', component: () => <AccessControlContent isModal={true} /> },
 ];
 
-export default function SecurityModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+export default function SecurityModal({ isOpen, onClose, runId }: { isOpen: boolean, onClose: () => void, runId?: string | null }) {
   const [activeTab, setActiveTab] = useState('encryption');
+  const tabs = TABS(runId);
 
   if (!isOpen) return null;
 
@@ -85,7 +86,7 @@ export default function SecurityModal({ isOpen, onClose }: { isOpen: boolean, on
 
         {/* Tab Bar */}
         <div className="shrink-0 bg-white border-b border-primary-gold/10 flex px-8 gap-8 overflow-x-auto no-scrollbar">
-          {TABS.map((tab) => (
+          {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -110,7 +111,7 @@ export default function SecurityModal({ isOpen, onClose }: { isOpen: boolean, on
                 transition={{ duration: 0.2 }}
               >
                 {(() => {
-                  const ActiveComp = TABS.find(t => t.id === activeTab)?.component || (() => null);
+                  const ActiveComp = tabs.find(t => t.id === activeTab)?.component || (() => null);
                   return <ActiveComp />;
                 })()}
               </motion.div>

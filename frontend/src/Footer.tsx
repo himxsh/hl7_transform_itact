@@ -37,21 +37,31 @@ export default function Footer() {
   );
 }
 
-const FooterColumn = ({ title, items }: { title: string, items: { label: string, href: string }[] }) => (
-  <div className="space-y-4">
-    <span className="font-mono text-[10px] uppercase tracking-widest text-gold">{title}</span>
-    <nav className="flex flex-col gap-2 font-sans text-sm text-slate-400">
-      {items.map(item => (
-        <a 
-          key={item.label} 
-          href={item.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-white transition-colors"
-        >
-          {item.label}
-        </a>
-      ))}
-    </nav>
-  </div>
-);
+const FooterColumn = ({ title, items }: { title: string, items: { label: string, href: string }[] }) => {
+  const handleClick = (href: string) => {
+    if (href.startsWith('mailto:')) {
+      window.location.href = href;
+      return;
+    }
+
+    window.open(href, '_blank', 'noopener,noreferrer');
+  };
+
+  return (
+    <div className="space-y-4">
+      <span className="font-mono text-[10px] uppercase tracking-widest text-gold">{title}</span>
+      <nav className="flex flex-col gap-2 font-sans text-sm text-slate-400">
+        {items.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            onClick={() => handleClick(item.href)}
+            className="w-fit text-left hover:text-white transition-colors cursor-pointer"
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+};

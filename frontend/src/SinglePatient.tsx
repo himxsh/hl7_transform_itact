@@ -312,8 +312,8 @@ export default function SinglePatient() {
                 className={`w-full mt-6 py-4 rounded-sm text-xs font-sans uppercase tracking-[0.2em] flex items-center 
                            justify-center gap-3 transition-all group ${
                   canSubmit
-                    ? 'bg-neutral-dark text-white hover:bg-neutral-dark/90'
-                    : 'bg-neutral-dark/30 text-white/50 cursor-not-allowed'
+                    ? 'bg-primary-gold text-charcoal border border-primary-gold shadow-[0_10px_30px_-18px_rgba(166,145,101,0.9)] hover:bg-primary-gold/90'
+                    : 'bg-neutral-dark/15 text-neutral-dark/35 dark:text-white/35 cursor-not-allowed border border-primary-gold/10'
                 }`}
               >
                 <ShieldCheck size={14} />

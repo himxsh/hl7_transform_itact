@@ -6,7 +6,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState, useRef, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Menu, Moon, Sun, X } from 'lucide-react';
+import { getStoredTheme, toggleTheme, type ThemeMode } from './theme';
 
 type TabId = 'home' | 'pipeline' | 'architecture' | 'compliance' | 'legal-framework' | 'digital-signatures' | 'gdpr' | 'healthcare' | 'case-studies' | 'data-lifecycle' | 'data-classification' | 'penalties' | 'consent' | 'encryption' | 'audit-log' | 'breach-detection' | 'compliance-score' | 'data-lineage' | 'risk-assessment' | 'access-control';
 
@@ -16,11 +17,15 @@ interface HeaderProps {
 
 export default function Header({ activeTab }: HeaderProps) {
   const [legalOpen, setLegalOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(() => getStoredTheme());
   const legalRef = useRef<HTMLDivElement>(null);
   const { pathname } = useLocation();
 
   useEffect(() => {
     window.scrollTo(0, 0);
+    setMobileOpen(false);
+    setLegalOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -31,6 +36,16 @@ export default function Header({ activeTab }: HeaderProps) {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const syncTheme = (event: Event) => {
+      const nextTheme = (event as CustomEvent<ThemeMode>).detail || getStoredTheme();
+      setTheme(nextTheme);
+    };
+
+    window.addEventListener('theme-change', syncTheme);
+    return () => window.removeEventListener('theme-change', syncTheme);
   }, []);
 
   const primaryNav = [
@@ -55,10 +70,10 @@ export default function Header({ activeTab }: HeaderProps) {
   const isLegalActive = legalPages.some(p => p.id === activeTab);
 
   return (
-    <header className="fixed top-0 w-full z-50 bg-[#f7f7f6]/80 backdrop-blur-md border-b border-gold/10">
+    <header className="fixed top-0 w-full z-50 bg-bg-light/80 backdrop-blur-md border-b border-gold/10">
       <div className="max-w-[1440px] mx-auto px-6 lg:px-12 py-5 flex items-center justify-between">
         <Link to="/" onClick={() => window.scrollTo(0, 0)} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-          <span className="font-title text-2xl tracking-tight font-light uppercase text-[#1c1a16]">
+          <span className="font-title text-2xl tracking-tight font-light uppercase text-neutral-dark">
             HL7 <span className="italic lowercase font-title">Orchestrator</span>
           </span>
         </Link>
@@ -130,9 +145,67 @@ export default function Header({ activeTab }: HeaderProps) {
 
         </nav>
         <div className="flex items-center gap-6">
+          <button
+            type="button"
+            onClick={() => setTheme(toggleTheme(theme))}
+            className="inline-flex items-center justify-center p-2 border border-gold/20 text-gold rounded-full hover:bg-gold/10 transition-colors"
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((open) => !open)}
+            className="md:hidden inline-flex items-center justify-center p-2 border border-gold/20 text-gold rounded-full"
+            aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+          </button>
           <span className="font-mono text-[10px] px-3 py-1 border border-gold text-gold tracking-tighter uppercase">v0.0.1</span>
         </div>
       </div>
+
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="md:hidden border-t border-gold/10 bg-bg-light/95 backdrop-blur-md"
+          >
+            <nav className="px-6 py-4 flex flex-col gap-1 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-600">
+              {primaryNav.map((item) => (
+                <Link
+                  key={item.id}
+                  to={item.path}
+                  onClick={() => window.scrollTo(0, 0)}
+                  className={`px-3 py-3 rounded-sm transition-colors ${activeTab === item.id ? 'bg-gold/10 text-gold' : 'hover:bg-gold/5'}`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+
+              <div className="mt-2 pt-3 border-t border-gold/10">
+                <div className="px-3 pb-2 text-[9px] tracking-[0.22em] text-slate-400">Legal</div>
+                <div className="flex flex-col gap-1">
+                  {legalPages.map((page) => (
+                    <Link
+                      key={page.id}
+                      to={page.path}
+                      onClick={() => window.scrollTo(0, 0)}
+                      className={`px-3 py-3 rounded-sm transition-colors ${activeTab === page.id ? 'bg-gold/10 text-gold' : 'hover:bg-gold/5'}`}
+                    >
+                      {page.label}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </nav>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
