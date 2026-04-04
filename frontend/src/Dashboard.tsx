@@ -18,6 +18,7 @@ import { useNavigate, useLocation, useBlocker } from 'react-router-dom';
 import SecurityModal from './SecurityModal';
 import Footer from './Footer';
 import { getStoredTheme, toggleTheme, type ThemeMode } from './theme';
+import { fetchWithAuth } from './api';
 
 // --- Types ---
 interface PatientRecord {
@@ -171,7 +172,7 @@ export default function Dashboard() {
         setTableHeaders(['Subject ID', 'Pseudonym', 'Sex', 'Observations', 'Output']);
         headersInitialized.current = true;
 
-        response = await fetch('/api/run-single', {
+        response = await fetchWithAuth('/api/run-single', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(locState.singlePatientData),
@@ -183,7 +184,7 @@ export default function Dashboard() {
           headersInitialized.current = true;
         }
 
-        response = await fetch('/api/run', {
+        response = await fetchWithAuth('/api/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dataset, runId: locState.runId || '', filePath: locState.filePath }),

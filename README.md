@@ -324,6 +324,13 @@ python main.py --type mimic
 python main.py --type mimic --data-dir dataset/ --out output/mimic/ --sample 50
 ```
 
+## Environment tokens
+
+- The dashboard expects `VITE_OPERATOR_TOKEN` to hold the same bearer token that the backend validates via `OPERATOR_TOKEN`. When running locally you can either
+  - let `start.sh` handle it (it propagates `OPERATOR_TOKEN` into `VITE_OPERATOR_TOKEN` for the Vite dev server), or
+  - export both manually before starting: `export OPERATOR_TOKEN="<token>"` and `export VITE_OPERATOR_TOKEN="$OPERATOR_TOKEN"`.
+- When building the Docker image include `--build-arg OPERATOR_TOKEN=<token>` so the frontend build stage embeds the token into `VITE_OPERATOR_TOKEN`. This keeps the production bundle and the backend aligned.
+
 Reads the specialized 3-file MIMIC-IV dataset and generates ORU^R01 messages.
 
 ### Run generic CSV pipeline

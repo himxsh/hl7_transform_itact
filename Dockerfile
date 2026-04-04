@@ -1,6 +1,8 @@
 # Stage 1: Build frontend
 FROM node:20-slim AS frontend-build
 WORKDIR /app/frontend
+ARG OPERATOR_TOKEN
+ENV VITE_OPERATOR_TOKEN=${OPERATOR_TOKEN}
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ .
