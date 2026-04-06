@@ -1,407 +1,166 @@
-# Secure HL7 Orchestration Pipeline
+# HL7 Transform IT Act
 
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/Naereen/StrapDown.js/graphs/commit-activity)
-![Docs build status](https://readthedocs.org/projects/hl7-transform/badge/?version=latest)
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/pdyban/hl7_transform/CI)
-[![PyPI license](https://img.shields.io/pypi/l/hl7-transform.svg)](https://pypi.python.org/pypi/hl7-transform/)
-[![PyPI pyversions](https://img.shields.io/pypi/pyversions/hl7-transform.svg)](https://pypi.python.org/pypi/hl7-transform/)
+<div align="center">
 
-A privacy-first, compliance-ready HL7 v2.5.1 message generation pipeline built on top of the [`hl7_transform`](https://github.com/pdyban/hl7_transform) library. This project extends the original fork to process real hospital data (MIMIC-IV), anonymize patient identity under the **DPDP Act 2023**, and sign every output message with a SHA-256 tamper-evident seal under the **IT Act 2000**.
+A privacy-first HL7 v2.5.1 generation pipeline for clinical datasets, built on top of `hl7_transform`.
 
----
+Transforms source records into signed HL7 messages, pseudonymizes patient identity, streams pipeline progress to a web dashboard, and validates post-generation integrity.
 
-## Table of Contents
+![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=flat-square&logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-19-20232A?style=flat-square&logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-Frontend-646CFF?style=flat-square&logo=vite&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind-v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 
-- [Secure HL7 Orchestration Pipeline](#secure-hl7-orchestration-pipeline)
-  - [Table of Contents](#table-of-contents)
-  - [Original Fork — Features](#original-fork--features)
-    - [Core Modules](#core-modules)
-    - [Key Capabilities](#key-capabilities)
-  - [Our Additions](#our-additions)
-    - [Architecture Overview](#architecture-overview)
-    - [Phase 1 — Data Preprocessing](#phase-1--data-preprocessing)
-    - [Phase 2 — Privacy Layer](#phase-2--privacy-layer)
-    - [Phase 3 — Security Layer](#phase-3--security-layer)
-    - [Phase 4 — Orchestration and Validation](#phase-4--orchestration-and-validation)
-    - [Phase 5 — Modern Security Dashboard (React)](#phase-5--modern-security-dashboard-react)
-  - [Frontend Architecture](#frontend-architecture)
-  - [Project Structure](#project-structure)
-  - [Requirements](#requirements)
-  - [Installation](#installation)
-    - [From PyPI (original library only)](#from-pypi-original-library-only)
-    - [From source (this fork, with all additions)](#from-source-this-fork-with-all-additions)
-  - [Usage](#usage)
-    - [Run the Modern Dashboard](#run-the-modern-dashboard)
-    - [Validate output integrity](#validate-output-integrity)
-    - [Use the library API directly](#use-the-library-api-directly)
-    - [CLI (original library)](#cli-original-library)
-    - [Walkthrough agent](#walkthrough-agent)
-  - [Running Tests](#running-tests)
-  - [Compliance Notes](#compliance-notes)
-  - [License](#license)
+</div>
 
----
+## What It Does
 
-## Original Fork — Features
+- Generates HL7 v2.5.1 messages from MIMIC-IV and generic CSV datasets.
+- Applies deterministic pseudonymization before patient data is written to HL7 fields.
+- Appends a SHA-256 tamper-evident `ZSH` segment to every output message.
+- Streams pipeline activity to a React dashboard over Server-Sent Events.
+- Provides integrity validation, audit logging, breach scanning, lineage tracing, and compliance scoring.
 
-This project is forked from [`pdyban/hl7_transform`](https://github.com/pdyban/hl7_transform), a lightweight Python package built on top of [`hl7apy`](https://github.com/crs4/hl7apy) that transforms HL7 v2.x messages using declarative field-mapping schemes.
+## Why This Repo Exists
 
-As a standard, HL7 permits different ways of implementing message interfaces between systems. Two systems exchanging ADT or SIU messages often carry the same information in different fields. In a hospital, an integration engine re-maps those messages on the fly. The original library lets you test those transformations without an integration engine in place.
+This repository extends the original [`hl7_transform`](https://github.com/pdyban/hl7_transform) library for a privacy-sensitive healthcare workflow. The core library remains intact while this project adds compliance-focused modules around it for anonymization, message signing, validation, and monitoring.
 
-### Core Modules
+## Stack
 
-| Module | Class | Responsibility |
-|---|---|---|
-| `field.py` | `HL7Field` | Parses dot-notation addresses like `PID.5.1` into segment / field / component indices. |
-| `message.py` | `HL7Message` | Wraps an `hl7apy` message object. Exposes `__getitem__` / `__setitem__` via `HL7Field` keys and factory methods `from_string()`, `from_file()`, `new()`. |
-| `mapping.py` | `HL7Mapping` | Loads a list of `{target_field → operation}` rules from **JSON** or **CSV**. A custom `object_hook` hydrates `HL7Field` and `HL7Operation` instances automatically. |
-| `operations.py` | `HL7Operation` (ABC) | Abstract base for all field-level operations. Concrete implementations: `CopyValue`, `SetValue`, `AddValues`, `Concatenate`, `GenerateAlphanumericID`, `GenerateNumericID`, `GenerateCurrentDatetime`, `SetEndTime`. New operations are registered via the `from_name()` class factory. |
-| `transform.py` | `HL7Transform` | The execution engine — iterates the mapping rules and sets `message[target_field] = operation(message)` for each rule. |
-| `__main__.py` | CLI | Reads a mapping file and an optional input `.hl7`, runs the transform, and writes the output. |
+- Backend: Python 3.8+, FastAPI, `hl7_transform`, `hl7apy`, pandas
+- Frontend: React 19, TypeScript, Vite, Tailwind CSS v4
+- Data flow: CSV input -> transformation -> anonymization -> signed HL7 output -> integrity validation
 
-### Key Capabilities
+## Project Layout
 
-- **Mapping-driven transformations** — define field-to-field rules in a plain JSON or CSV file; no code changes required.
-- **Rich operation library** — copy, set, add, concatenate, generate IDs, generate timestamps.
-- **CLI support** — `hl7_transform --help` for direct shell usage.
-- **Composable Python API** — import `HL7Mapping`, `HL7Transform`, and `HL7Message` directly into your own scripts or Jupyter notebooks.
-- **Sphinx documentation** hosted on [ReadTheDocs](https://hl7-transform.readthedocs.io/en/latest/).
-- **MIT licensed**, with a live web demo at [hl7_transform_web](https://github.com/pdyban/hl7_transform_web).
-
----
-
-## Our Additions
-
-The original library was designed for message routing and testing — it had no concept of source data, patient privacy, or message security. Once real hospital records (MIMIC-IV) are introduced, two Indian laws are immediately triggered:
-
-- **DPDP Act 2023 §8(7)** — data fiduciaries must de-identify personal data where the actual identity is not required for the processing purpose.
-- **IT Act 2000 §43A / §72A** — organisations handling sensitive personal data must implement reasonable security practices; wrongful disclosure is a criminal offence.
-
-We added **six new phases** to address these requirements, including a **Modern Web Dashboard** for real-time monitoring and compliance auditing. None of the original library files were modified.
-
-### Architecture Overview
-
-```
-MIMIC-IV CSVs ──► preprocess_mimic.py ──► merged DataFrame
-                                               │
-                        JSON mapping file ◄────┘
-                                │
-                   HL7Mapping.from_json()
-                                │
-                       HL7Transform(mapping)
-                                │
-                    for each patient row:
-                      HL7Message.new()
-                           │
-                      Anonymizer            ← INJECT 1 (before PID values are written)
-                  (name, address, NTE)
-                           │
-                      transform(msg)
-                           │
-                      msg.to_string()
-                           │
-                      IntegrityManager      ← INJECT 2 (after serialization)
-                      (SHA-256 + ZSH)
-                           │
-                    output/<subject_id>.hl7
-                           │
-              ┌────────────┴─────────────┐
-              │                          │
-      validate_integrity.py      Modern Security Dashboard
-      (post-hoc verification)    (React + Vite + FastAPI)
-                                         │
-                         ┌───────────────┴───────────────┐
-                         │   Security & Compliance Center│
-                         └───────────────────────────────┘
-                                         │
-                ┌────────────┬───────────┼───────────┬────────────┐
-                │            │           │           │            │
-          Audit Log   Breach Scan   Data Lineage   Risk Matrix   RBAC
-```
-
-Both injection points wrap the original library — the library itself is never touched.
-
----
-
-### Phase 1 — Data Preprocessing
-
-**File:** `preprocess_mimic.py`
-
-Merges three MIMIC-IV v2.2 compressed CSV files into a single clean pandas DataFrame containing 50 patient records, ready for HL7 message construction.
-
-| Source file | Size | Columns used |
-|---|---|---|
-| `patients.csv.gz` | ~3 MB | `subject_id`, `gender`, `anchor_age`, `anchor_year`, `dod` |
-| `labevents.csv.gz` | ~2.4 GB | `subject_id`, `itemid`, `charttime`, `value`, `valuenum`, `valueuom`, `ref_range_lower`, `ref_range_upper`, `flag`, `comments` |
-| `d_labitems.csv.gz` | ~50 KB | `itemid`, `label`, `fluid`, `category` |
-
-**Key engineering decisions:**
-
-- **Chunked streaming** (`chunksize=100_000`) on the 2.4 GB labevents file — only ~14,000 matched rows are materialised in memory instead of 158 million.
-- **Denormalized output** via two LEFT JOINs (labevents → d_labitems → patients) puts all demographics and lab metadata on a single row, making per-patient HL7 construction trivial.
-- `birth_year = anchor_year − anchor_age` respects MIMIC's privacy-by-design (no raw date-of-birth stored).
-- All null counts are logged to `pipeline.log` for a compliance audit trail.
-
-```python
-from preprocess_mimic import preprocess
-
-df = preprocess(data_dir="dataset/", sample_size=50)
-```
-
----
-
-### Phase 2 — Privacy Layer
-
-**File:** `hl7_transform/anonymizer.py`
-
-Implements the `Anonymizer` class that replaces real patient PII before any value is written into an HL7 field. Injected **before** `HL7Transform` runs.
-
-| Target | Method |
-|---|---|
-| Patient name (`PID.5.1`, `PID.5.2`) | Deterministic `Faker(locale="en_IN")` seeded with `subject_id` |
-| Patient address (`PID.11`) | Deterministic fake Indian address seeded with `subject_id` |
-| NTE free-text notes | Regex scrubbing of SSN, Aadhaar, PAN, email, phone, MRN, and 10–12 digit IDs |
-
-Deterministic seeding ensures the same `subject_id` always maps to the same fake identity — referential integrity is preserved across multiple lab events without storing a lookup table.
-
-**Compliance reference:** DPDP Act 2023 §8(7), §8(4).
-
----
-
-### Phase 3 — Security Layer
-
-**File:** `hl7_transform/integrity.py`
-
-Implements the `IntegrityManager` class that computes a SHA-256 hash of the fully serialized HL7 message and appends a tamper-evident `ZSH` Z-segment. Injected **after** `msg.to_string()`.
-
-**ZSH segment format:**
-
-```
-ZSH|1|SHA256|<hex_digest>|SIGNED|<ISO-8601 UTC timestamp>
-```
-
-| Field | Value |
-|---|---|
-| `ZSH.1` | Segment set ID — always `"1"` |
-| `ZSH.2` | Hash algorithm — `"SHA256"` |
-| `ZSH.3` | Hex-encoded SHA-256 digest of all message content before the ZSH line |
-| `ZSH.4` | Status — `"SIGNED"` |
-| `ZSH.5` | ISO 8601 UTC signing timestamp |
-
-**Compliance reference:** IT Act 2000 §43A, §72A.
-
----
-
-### Phase 4 — Orchestration and Validation
-
-**`main.py`** chains all components into a single pipeline:
-
-```
-read MIMIC-IV data → build HL7 message → anonymize PII → sign with ZSH → write .hl7
-```
-
-- Produces one `output/<subject_id>.hl7` file per patient.
-- Full audit logging to `pipeline.log`.
-- Configurable via CLI flags (`--data-dir`, `--out`, `--sample`).
-
-**`validate_integrity.py`** provides post-hoc tamper detection:
-
-- Re-reads every `.hl7` file in `output/`.
-- Strips the `ZSH` segment, recomputes the SHA-256 hash, and compares it against `ZSH.3`.
-- Exits with code `0` if all files pass, `1` if any fail.
-
----
-
-### Phase 5 — Modern Security Dashboard (React)
-
-**Directory:** `frontend/`
-
-A high-performance React + Vite dashboard that provides real-time visualization of the pipeline status and deep-dive compliance analytics.
-
-- **Real-time Monitoring**: SSE-based (Server-Sent Events) progress tracking for both MIMIC and Generic pipelines.
-- **Security & Compliance Center**: A centralized modal housing:
-  - **Audit Log**: JSON-structured compliance trail (§67C).
-  - **Multi-Algorithm Comparison**: Side-by-side performance metrics for SHA-256, AES-256, HMAC-SHA512, and SHA3-256.
-  - **Breach Detection**: Automated scanning for PII leaks using deterministic entropy checks.
-  - **Risk Assessment**: Dynamic 5x5 risk matrix calculating impact vs. likelihood.
-  - **Data Lineage**: Visual graph tracing data from source CSV columns to HL7 segments.
-  - **Access Control**: RBAC simulation for Clinical Investigators, Data Fiduciaries, and Auditors.
-- **Navigation Guard**: Integrated `useBlocker` protection to prevent data loss during active orchestration.
-
----
-
-## Frontend Architecture
-
-The frontend is built with **React 18**, **Vite**, **Tailwind CSS**, and **Framer Motion**.
-
-- **State Management**: React Context / Hooks for pipeline synchronization.
-- **Micro-Animations**: Layout transitions and real-time status indicators.
-- **Modular Components**: Each security feature is a decoupled `*Content` component, allowing 100% feature parity between the standalone pages and the Dashboard modal.
-
----
-
-## Project Structure
-
-```
+```text
 hl7_transform_itact/
-├── main.py                        # Orchestration script (Phase 4a)
-├── preprocess_mimic.py            # MIMIC-IV data pipeline (Phase 1)
-├── validate_integrity.py          # Tamper-detection verifier (Phase 4b)
-├── requirements.txt
-├── setup.py / setup.cfg
-├── agents/
-│   └── explanation_plan.py        # AI walkthrough agent scripts
-├── dataset/                       # MIMIC-IV CSV source files (not tracked in git)
-├── mappings/                      # JSON/CSV HL7 mapping definitions
-├── output/                        # Generated .hl7 files
-└── hl7_transform/                 # Extended library (original + additions)
-    ├── anonymizer.py              # Privacy Layer        ← NEW
-    ├── integrity.py               # Security Layer       ← NEW
-    ├── field.py                   # Original
-    ├── message.py                 # Original
-    ├── mapping.py                 # Original
-    ├── operations.py              # Original
-    ├── transform.py               # Original
-    └── test/
-        ├── test_transform.py
-        ├── test_mapping.py
-        ├── test_message.py
-        ├── test_operations.py
-        └── test_cli.py
+├── app.py                     # FastAPI backend + SSE endpoints
+├── main.py                    # CLI entry point for pipeline runs
+├── preprocess_mimic.py        # MIMIC-IV preprocessing
+├── validate_integrity.py      # HL7 signature verification
+├── pipelines/                 # MIMIC and generic dataset pipelines
+├── hl7_transform/             # Original library + compliance extensions
+├── frontend/                  # React dashboard
+├── mappings/                  # HL7 field mappings
+├── dataset/                   # Source CSV files (not tracked)
+└── output/                    # Generated HL7 files (not tracked)
 ```
 
----
+## Quick Start
 
-## Requirements
-
-- Python ≥ 3.8
-- [hl7apy](https://github.com/crs4/hl7apy)
-- [pandas](https://pandas.pydata.org/)
-- [Faker](https://faker.readthedocs.io/)
-
----
-
-## Installation
-
-### From PyPI (original library only)
+### 1. Install backend dependencies
 
 ```bash
-pip install hl7_transform
-```
-
-### From source (this fork, with all additions)
-
-```bash
-git clone https://github.com/your-org/hl7_transform_itact.git
-cd hl7_transform_itact
 python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
+source venv/bin/activate
 pip install -r requirements.txt
 python setup.py install
 ```
 
----
-
-## Usage
-
-### Run the Modern Dashboard
+### 2. Install frontend dependencies
 
 ```bash
-# Terminal 1: Backend
-python app.py
-
-# Terminal 2: Frontend
 cd frontend
 npm install
-npm run dev
+cd ..
 ```
 
-The dashboard will be available at `http://localhost:5173`.
+### 3. Start the full app
 
 ```bash
-python main.py --type mimic
-# with optional parameters
-python main.py --type mimic --data-dir dataset/ --out output/mimic/ --sample 50
+bash start.sh
 ```
 
-Reads the specialized 3-file MIMIC-IV dataset and generates ORU^R01 messages.
+Development URLs:
 
-### Run generic CSV pipeline
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8000`
+
+## Run Pipelines
+
+### MIMIC-IV pipeline
+
+```bash
+python main.py --type mimic --sample 50
+```
+
+### Generic CSV pipeline
 
 ```bash
 python main.py --type generic --csv dataset/indian_liver_patient.csv --out output/liver/
 ```
 
-Reads any flat medical CSV and uses a configurable mapping to generate signed, anonymized HL7 messages.
-
-### Validate output integrity
+## Validate Output Integrity
 
 ```bash
-python validate_integrity.py                          # verify all files in output/
-python validate_integrity.py output/10000032.hl7      # verify a single file
+python validate_integrity.py
+python validate_integrity.py output/10000032.hl7
 ```
 
-Exit code `0` = all passed. Exit code `1` = one or more files failed.
+Exit code `0` means all files passed. Exit code `1` means at least one file failed verification.
 
-### Use the library API directly
+## Run the Backend and Frontend Separately
 
-```python
-from hl7_transform.mapping import HL7Mapping
-from hl7_transform.transform import HL7Transform
-from hl7_transform.message import HL7Message
-
-mapping = HL7Mapping.from_json('mappings/test_transform.json')
-message = HL7Message.from_file('hl7_transform/test/test_msg.hl7')
-transform = HL7Transform(mapping)
-transformed_message = transform(message)
-```
-
-### CLI (original library)
+### Backend
 
 ```bash
-hl7_transform --help
+python app.py
 ```
 
-### Walkthrough agent
+### Frontend
 
 ```bash
-python agents/explanation_plan.py                      # full walkthrough
-python agents/explanation_plan.py --topic overview     # single topic
+cd frontend
+npm run dev
 ```
 
-Available topics: `overview`, `architecture`, `phase1`, `phase2`, `phase3`, `phase4`, `validator`, `dataflow`, `compliance`, `testing`.
-
----
-
-## Running Tests
+## Tests and Checks
 
 ```bash
 python -m pytest hl7_transform/test/ -v
-```
-
-Lint check:
-
-```bash
 bash run_flake.sh
+cd frontend && npm run lint
 ```
 
----
+## Environment Tokens
 
-## Compliance Notes
+- The dashboard expects `VITE_OPERATOR_TOKEN` to match the backend’s `OPERATOR_TOKEN`. Locally you can either let `start.sh` propagate the token (it mirrors `OPERATOR_TOKEN` into `VITE_OPERATOR_TOKEN` before spinning up Vite) or set both env vars manually: `export OPERATOR_TOKEN="<token>"` and `export VITE_OPERATOR_TOKEN="$OPERATOR_TOKEN"`.
+- When building the Docker image, pass the same token via `--build-arg OPERATOR_TOKEN=<token>` so the production bundle receives `VITE_OPERATOR_TOKEN` without rebuilding.
 
-| Regulation | Section | How we address it |
-|---|---|---|
-| DPDP Act 2023 | §8(7) — De-identification | `Anonymizer` replaces all PII before it enters any HL7 field |
-| DPDP Act 2023 | §8(4) — Purpose limitation | Only columns required for clinical lab reporting are retained |
-| IT Act 2000 | §43A — Reasonable security practices | SHA-256 `ZSH` segment provides tamper-evidence at the message level |
-| IT Act 2000 | §72A — Wrongful disclosure | `validate_integrity.py` detects any post-generation modification |
+## Continuous Deployment
 
-All pipeline events are logged to `pipeline.log` for a full compliance audit trail.
+- The GitHub Actions workflow pushes `hl7-transform-itact` into your container registry (`REGISTRY_IMAGE`) when `REGISTRY_USERNAME`/`REGISTRY_PASSWORD` are set, tagging the image as `${{ github.sha }}` and `latest`.
+- After the image push, the deploy job triggers Render’s API using `RENDER_SERVICE_ID` and `RENDER_API_KEY`, so the live service fetches the updated container.
+- Set these repository secrets for CD to run:
+  - `REGISTRY_IMAGE` (e.g., `docker.io/yourorg/hl7-transform-itact`)
+  - `REGISTRY_USERNAME` and `REGISTRY_PASSWORD` for the registry
+  - `RENDER_SERVICE_ID` and `RENDER_API_KEY` for `https://api.render.com/v1/services/{serviceId}/deploys`
+- Render deploys only when the workflow runs on `master` pushes; feature branches just run the CI jobs before merging.
 
----
+## Core Additions in This Fork
+
+- `hl7_transform/anonymizer.py`: deterministic patient pseudonymization and note scrubbing
+- `hl7_transform/integrity.py`: SHA-256 signing and `ZSH` segment creation
+- `audit_logger.py`: structured compliance logging
+- `breach_detector.py`: PII leak scanning
+- `compliance_scorer.py`: rule-based compliance scoring
+- `data_lineage.py`: source-to-HL7 traceability
+- `risk_assessment.py`: risk matrix support
+- `access_control.py`: RBAC simulation
+
+## Compliance Focus
+
+- DPDP Act 2023: de-identification and purpose-limited handling of personal data
+- IT Act 2000: tamper evidence, auditability, and security controls for sensitive data workflows
+
+## Notes for Contributors
+
+- Do not modify the original core library files: `field.py`, `message.py`, `mapping.py`, `operations.py`, `transform.py`, `__main__.py`
+- Use logging instead of `print` for runtime behavior
+- Keep new compliance-related modules documented with module-level docstrings and legal references
 
 ## License
 
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
-
-The original `hl7_transform` library is authored by Pavlo Dyban (Doctolib GmbH) and is also MIT licensed.
+MIT License. See `LICENSE` for details.
