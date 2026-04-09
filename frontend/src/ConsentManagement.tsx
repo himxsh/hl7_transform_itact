@@ -2,7 +2,9 @@ import { motion } from 'motion/react';
 import { UserCheck, ToggleRight, FileText, Shield, Clock, AlertTriangle } from 'lucide-react';
 import Header from './Header';
 import Footer from './Footer';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { isConsentGranted, setConsentGranted } from './posthog';
+
 
 interface ConsentRecord {
   purpose: string;
@@ -16,6 +18,7 @@ const initialConsents: ConsentRecord[] = [
   { purpose: 'HL7 Message Generation', granted: true, timestamp: '2026-03-14 09:15:22 IST', legalBasis: 'DPDP §8(1) — Legitimate processing' },
   { purpose: 'Anonymisation of PII', granted: true, timestamp: '2026-03-14 09:15:22 IST', legalBasis: 'DPDP §8(7) — De-identification required by law' },
   { purpose: 'SHA-256 Integrity Sealing', granted: true, timestamp: '2026-03-14 09:15:22 IST', legalBasis: 'IT Act §14 — Secure Electronic Record' },
+  { purpose: 'Usage Analytics', granted: isConsentGranted(), timestamp: isConsentGranted() ? '2026-03-14 09:15:22 IST' : '—', legalBasis: 'DPDP §6 — Optional analytical tracking' },
   { purpose: 'Clinical Research (Secondary Use)', granted: false, timestamp: '—', legalBasis: 'DPDP §8(3) — Requires separate consent' },
   { purpose: 'Cross-Border Data Transfer', granted: false, timestamp: '—', legalBasis: 'DPDP §16 — Government whitelist required' },
   { purpose: 'Marketing & Commercial Use', granted: false, timestamp: '—', legalBasis: 'DPDP §5 — Not a legitimate purpose' },
@@ -46,10 +49,17 @@ export default function ConsentManagement() {
       if (i !== idx) return c;
       // Don't allow toggling mandatory consents (first 4)
       if (i < 4) return c;
+
+      const newGranted = !c.granted;
+      if (c.purpose === 'Usage Analytics') {
+        setConsentGranted(newGranted);
+        // If granted, we can reload to trigger initialization or just wait for next load/hook call
+      }
+
       return {
         ...c,
-        granted: !c.granted,
-        timestamp: !c.granted ? new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata', hour12: false }).replace(',', '') + ' IST' : '—'
+        granted: newGranted,
+        timestamp: newGranted ? new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata', hour12: false }).replace(',', '') + ' IST' : '—'
       };
     }));
   };
