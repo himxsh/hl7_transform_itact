@@ -188,3 +188,9 @@ topic_1.md
 video_full_script.md
 video_intro_topic_1.md
 video_novelty_topic.md
+hl7_orchestrator_demo.mp4
+
+# Extra ignores
+*.zip
+lnmiit_logo.png
+
